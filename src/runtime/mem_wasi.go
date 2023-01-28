@@ -15,7 +15,7 @@ import (
 // which prevents us from allocating more stack.
 //
 //go:nosplit
-func sysAlloc(n uintptr, sysStat *uint64) unsafe.Pointer {
+func sysAlloc(n uintptr, sysStat *sysMemStat) unsafe.Pointer {
 	p := sysReserve(nil, n)
 	sysMap(p, n, sysStat)
 	return p
@@ -24,7 +24,7 @@ func sysAlloc(n uintptr, sysStat *uint64) unsafe.Pointer {
 func sysUnused(v unsafe.Pointer, n uintptr) {
 }
 
-func sysUsed(v unsafe.Pointer, n uintptr) {
+func sysUsed(v unsafe.Pointer, n, prepared uintptr) {
 }
 
 func sysHugePage(v unsafe.Pointer, n uintptr) {
@@ -34,8 +34,9 @@ func sysHugePage(v unsafe.Pointer, n uintptr) {
 // which prevents us from allocating more stack.
 //
 //go:nosplit
-func sysFree(v unsafe.Pointer, n uintptr, sysStat *uint64) {
-	mSysStatDec(sysStat, n)
+func sysFree(v unsafe.Pointer, n uintptr, sysStat *sysMemStat) {
+	// FIXME
+	//mSysStatDec(sysStat, n)
 }
 
 func sysFault(v unsafe.Pointer, n uintptr) {
@@ -74,8 +75,9 @@ func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 func currentMemory() int32
 func growMemory(pages int32) int32
 
-func sysMap(v unsafe.Pointer, n uintptr, sysStat *uint64) {
-	mSysStatInc(sysStat, n)
+func sysMap(v unsafe.Pointer, n uintptr, sysStat *sysMemStat) {
+	// FIXME
+	//mSysStatInc(sysStat, n)
 }
 
 // Don't split the stack as this function may be invoked without a valid G,
