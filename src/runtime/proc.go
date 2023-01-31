@@ -2238,6 +2238,9 @@ var newmHandoff struct {
 //
 //go:nowritebarrierrec
 func newm(fn func(), pp *p, id int64) {
+	if GOARCH == "wasm" {
+		return
+	}
 	// allocm adds a new M to allm, but they do not start until created by
 	// the OS in newm1 or the template thread.
 	//
@@ -2344,6 +2347,9 @@ func startTemplateThread() {
 //
 //go:nowritebarrierrec
 func templateThread() {
+	if GOARCH == "wasm" {
+		return
+	}
 	lock(&sched.lock)
 	sched.nmsys++
 	checkdead()
