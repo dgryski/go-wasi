@@ -46,6 +46,8 @@ type Stat_t struct {
 	Atime    Timestamp_t
 	Mtime    Timestamp_t
 	Ctime    Timestamp_t
+
+	Mode int // FIXME
 }
 
 type Fdstat_t struct {
@@ -99,6 +101,7 @@ const (
 	RIGHT_POLL_FD_READWRITE       Rights_t = 0x0000000008000000
 	RIGHT_SOCK_SHUTDOWN           Rights_t = 0x0000000010000000
 
+	// https://github.com/WebAssembly/WASI/blob/main/phases/snapshot/docs.md#-filetype-variant
 	FILETYPE_UNKNOWN          Filetype_t = 0
 	FILETYPE_BLOCK_DEVICE     Filetype_t = 1
 	FILETYPE_CHARACTER_DEVICE Filetype_t = 2
