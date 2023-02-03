@@ -169,6 +169,10 @@ func osyield_no_g() {
 // 	panicmem()
 // }
 
+func sigpanic() {
+	// FIXME
+}
+
 type sigset struct{}
 
 // Called to initialize a new m (including the bootstrap m).
