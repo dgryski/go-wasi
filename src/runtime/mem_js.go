@@ -74,6 +74,7 @@ func sysReserveOS(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 	return v
 }
 
+// Implemented in src/runtime/sys_wasm.s
 func currentMemory() int32
 func growMemory(pages int32) int32
 
