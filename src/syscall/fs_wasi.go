@@ -16,6 +16,7 @@ import (
 type uintptr_t uint32
 type size_t uint32
 
+// Julien: do we actually want to expose all these types and syscalls ?
 type Device_t uint64
 type Fd_t uint32
 type Fdflags_t uint32
@@ -295,7 +296,7 @@ func Random_get(
 	buf_len size_t,
 ) Errno
 
-const rootFD Fd_t = 3
+const rootFD Fd_t = 1 // Julien: no clue where this magic number is coming from.
 
 var rootRightsDir Rights_t
 var rootRightsFile Rights_t
