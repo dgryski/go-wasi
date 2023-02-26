@@ -17,6 +17,11 @@ const (
 	readdirFileInfo
 )
 
+// remove me
+func (f*File) ReadDirent(buf []byte) (int, error) {
+    return f.pfd.ReadDirent(buf)
+}
+
 // Readdir reads the contents of the directory associated with file and
 // returns a slice of up to n FileInfo values, as would be returned
 // by Lstat, in directory order. Subsequent calls on the same file will yield
