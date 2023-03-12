@@ -1,0 +1,1 @@
+I will not allocate when passed a string longer than 32 bytes.

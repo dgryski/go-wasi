@@ -47,14 +47,15 @@ func (fd *FD) ReadDirent(buf []byte) (int, error) {
     }
 
     next, ok := direntNext(buf)
-    if next < uint64(fd.next) {
-        panic(fd.next)
-    }
     if ok {
         fd.next = syscall.Dircookie_t(next)
     }
 
     return n, nil
+}
+
+func (fd *FD) Next() syscall.Dircookie_t {
+    return fd.next
 }
 
 func direntNext(buf []byte) (uint64, bool) {
