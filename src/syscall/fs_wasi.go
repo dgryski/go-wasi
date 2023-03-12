@@ -479,9 +479,8 @@ func Mkdir(path string, perm uint32) error {
 		return errnoErr(errno)
 	}
 	// FIXME: matches rights to perm
-	if errno := Fd_fdstat_set_rights(rootFD, RIGHT_FULL, RIGHT_FULL); errno != 0 {
-		return errnoErr(errno)
-	}
+    // Not all WASM runtime support rights so we ignore the potential error.
+	_ = Fd_fdstat_set_rights(rootFD, RIGHT_FULL, RIGHT_FULL)
 	return nil
 }
 

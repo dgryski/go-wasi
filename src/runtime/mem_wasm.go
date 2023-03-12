@@ -1,65 +1,14 @@
-// Copyright 2023 The Go Authors. All rights reserved.
+// Copyright 2018 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build wasi && wasm
+//go:build wasm && (js || wasi)
 
 package runtime
 
 import (
 	"unsafe"
 )
-
-// Don't split the stack as this function may be invoked without a valid G,
-// which prevents us from allocating more stack.
-//
-//go:nosplit
-func sysAlloc(n uintptr, sysStat *sysMemStat) unsafe.Pointer {
-	p := sysReserve(nil, n)
-	sysMap(p, n, sysStat)
-	return p
-}
-
-func sysUnused(v unsafe.Pointer, n uintptr) {
-}
-
-func sysUsed(v unsafe.Pointer, n, prepared uintptr) {
-}
-
-func sysHugePage(v unsafe.Pointer, n uintptr) {
-}
-
-// Don't split the stack as this function may be invoked without a valid G,
-// which prevents us from allocating more stack.
-//
-//go:nosplit
-func sysFree(v unsafe.Pointer, n uintptr, sysStat *sysMemStat) {
-	// FIXME
-	sysStat.add(-int64(n))
-	sysFreeOS(v, n)
-}
-
-func sysFault(v unsafe.Pointer, n uintptr) {
-}
-
-var reserveEnd uintptr
-
-func sysReserve(v unsafe.Pointer, n uintptr) unsafe.Pointer {
-	return sysReserveOS(v, n)
-}
-
-// src/runtime/sys_wasm.s#92
-func currentMemory() int32
-
-// src/runtime/sys_wasm.s#98
-func growMemory(pages int32) int32
-
-func sysMap(v unsafe.Pointer, n uintptr, sysStat *sysMemStat) {
-	// FIXME
-	//mSysStatInc(sysStat, n)
-	sysStat.add(int64(n))
-	sysMapOS(v, n)
-}
 
 // Don't split the stack as this function may be invoked without a valid G,
 // which prevents us from allocating more stack.
@@ -85,11 +34,12 @@ func sysHugePageOS(v unsafe.Pointer, n uintptr) {
 //
 //go:nosplit
 func sysFreeOS(v unsafe.Pointer, n uintptr) {
-	// FIXME
 }
 
 func sysFaultOS(v unsafe.Pointer, n uintptr) {
 }
+
+var reserveEnd uintptr
 
 func sysReserveOS(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 	// TODO(neelance): maybe unify with mem_plan9.go, depending on how https://github.com/WebAssembly/design/blob/master/FutureFeatures.md#finer-grained-control-over-memory turns out
@@ -118,12 +68,21 @@ func sysReserveOS(v unsafe.Pointer, n uintptr) unsafe.Pointer {
 		if growMemory(needed-current) == -1 {
 			return nil
 		}
-		// FIXME: resetMemoryDataView()
+		//resetMemoryDataView()
 	}
 
 	return v
 }
 
+// Implemented in src/runtime/sys_wasm.s
+func currentMemory() int32
+func growMemory(pages int32) int32
+
+// resetMemoryDataView signals the JS front-end that WebAssembly's memory.grow instruction has been used.
+// This allows the front-end to replace the old DataView object with a new one.
+//
+//go:wasmimport gojs runtime.resetMemoryDataView
+func resetMemoryDataView()
+
 func sysMapOS(v unsafe.Pointer, n uintptr) {
-	// FIXME
 }
