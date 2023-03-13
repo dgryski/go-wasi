@@ -464,6 +464,14 @@ func (t *fsTester) checkStat(path string, entry fs.DirEntry) {
 // checkDirList checks that two directory lists contain the same files and file info.
 // The order of the lists need not match.
 func (t *fsTester) checkDirList(dir, desc string, list1, list2 []fs.DirEntry) {
+    println(list1)
+    for _, l := range list1 {
+        println(l.Name())
+    }
+    println(list2)
+    for _, l := range list2 {
+        println(l.Name())
+    }
 	old := make(map[string]fs.DirEntry)
 	checkMode := func(entry fs.DirEntry) {
 		if entry.IsDir() != (entry.Type()&fs.ModeDir != 0) {
