@@ -286,7 +286,7 @@ func Getppid() int {
 
 func Gettimeofday(tv *Timeval) error {
 	var time timestamp
-	if errno := __wasi_clock_time_get(clock_realtime, 1e3, &time); errno != 0 {
+	if errno := clockTimeGet(clockRealtime, 1e3, &time); errno != 0 {
 		return errno
 	}
 	tv.setTimestamp(time)
