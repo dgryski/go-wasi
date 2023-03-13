@@ -129,25 +129,18 @@ func (t *fsTester) openDir(dir string) fs.ReadDirFile {
 // checkDir checks the directory dir, which is expected to exist
 // (it is either the root or was found in a directory listing with IsDir true).
 func (t *fsTester) checkDir(dir string) {
-    println("t.checkDir")
-    defer println("t.checkDir")
 	// Read entire directory.
 	t.dirs = append(t.dirs, dir)
 	d := t.openDir(dir)
 	if d == nil {
 		return
 	}
-    println("1st Readir(-1)")
 	list, err := d.ReadDir(-1)
 	if err != nil {
-        println("boop")
-        println(err)
 		d.Close()
 		t.errorf("%s: ReadDir(-1): %v", dir, err)
 		return
 	}
-
-    println("done 1st Readir(-1)")
 
 	// Check all children.
 	var prefix string
@@ -179,7 +172,6 @@ func (t *fsTester) checkDir(dir string) {
 		}
 	}
 
-    println("Readir(-1)")
 	// Check ReadDir(-1) at EOF.
 	list2, err := d.ReadDir(-1)
 	if len(list2) > 0 || err != nil {
@@ -264,7 +256,6 @@ func (t *fsTester) checkDir(dir string) {
 		}
 	}
 
-    fmt.Println("fs.ReadDir: ", dir)
 	// Check fs.ReadDir as well.
 	list2, err = fs.ReadDir(t.fsys, dir)
 	if err != nil {
@@ -280,7 +271,6 @@ func (t *fsTester) checkDir(dir string) {
 	}
 
 	t.checkGlob(dir, list)
-    fmt.Println("checkDir done")
 }
 
 // formatEntry formats an fs.DirEntry into a string for error messages and comparison.
@@ -464,14 +454,6 @@ func (t *fsTester) checkStat(path string, entry fs.DirEntry) {
 // checkDirList checks that two directory lists contain the same files and file info.
 // The order of the lists need not match.
 func (t *fsTester) checkDirList(dir, desc string, list1, list2 []fs.DirEntry) {
-    println(list1)
-    for _, l := range list1 {
-        println(l.Name())
-    }
-    println(list2)
-    for _, l := range list2 {
-        println(l.Name())
-    }
 	old := make(map[string]fs.DirEntry)
 	checkMode := func(entry fs.DirEntry) {
 		if entry.IsDir() != (entry.Type()&fs.ModeDir != 0) {
