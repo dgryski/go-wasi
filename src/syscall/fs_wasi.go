@@ -22,7 +22,7 @@ type Fdflags_t uint32
 type Filesize_t uint64
 type Filetype_t uint8
 type Inode_t uint64
-type Linkcount_t uint32
+type Linkcount_t uint64
 type Lookupflags_t uint32
 type Oflags_t uint32
 type Rights_t uint64
