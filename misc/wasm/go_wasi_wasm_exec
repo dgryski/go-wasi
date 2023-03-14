@@ -17,6 +17,7 @@ if [[ $RUNTIME == "wazero" ]]; then
 		ARGS="-hostlogging=clock,exit,filesystem,memory,poll,random"
 	fi
 	echo "Running with wazero: $PWD"
+	mkdir -p "${GOROOT}/tmp"
 	exec wazero run -env PWD=${PWD#"$GOROOT"} -env GOROOT=/ -mount $GOROOT:/ $ARGS $1 -- "${@:2}"
 else
 	echo "Running with wasmtime: $PWD"
