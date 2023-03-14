@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build aix || dragonfly || freebsd || (js && wasm) || wasi || linux || netbsd || openbsd || solaris
+//go:build aix || dragonfly || freebsd || (js && wasm) || wasip1 || linux || netbsd || openbsd || solaris
 
 package os
 
@@ -41,12 +41,12 @@ func (d *dirInfo) close() {
 	}
 }
 
-//FIXME: readdir is fucked up with wasi.
+// FIXME: readdir is fucked up with wasip1.
 func (f *File) readdir(n int, mode readdirMode) (names []string, dirents []DirEntry, infos []FileInfo, err error) {
 	// If this file has no dirinfo, create one.
 	if f.dirinfo == nil {
 		f.dirinfo = new(dirInfo)
-        f.dirinfo.buf = dirBufPool.Get().(*[]byte)
+		f.dirinfo.buf = dirBufPool.Get().(*[]byte)
 	}
 	d := f.dirinfo
 
@@ -70,7 +70,7 @@ func (f *File) readdir(n int, mode readdirMode) (names []string, dirents []DirEn
 			var errno error
 			d.nbuf, errno = f.pfd.ReadDirent(*d.buf)
 			runtime.KeepAlive(f)
-            if errno != nil {
+			if errno != nil {
 				return names, dirents, infos, &PathError{Op: "readdirent", Path: f.name, Err: errno}
 			}
 			if d.nbuf <= 0 {
@@ -91,10 +91,10 @@ func (f *File) readdir(n int, mode readdirMode) (names []string, dirents []DirEn
 			break
 		}
 		if ino == 0 {
-            //FIXME(julien): looks like in WASI inodes might be 0 ?
-            if runtime.GOOS != "wasi" {
-                continue
-            }
+			//FIXME(julien): looks like in WASI inodes might be 0 ?
+			if runtime.GOOS != "wasip1" {
+				continue
+			}
 		}
 		const namoff = uint64(unsafe.Offsetof(syscall.Dirent{}.Name))
 		namlen, ok := direntNamlen(rec)
