@@ -103,14 +103,6 @@ func unminit() {
 func mdestroy(mp *m) {
 }
 
-func osinit() {
-	// https://webassembly.github.io/spec/core/exec/runtime.html#memory-instances
-	physPageSize = 64 * 1024
-	initBloc()
-	ncpu = 1
-	getg().m.procid = 2
-}
-
 // wasm has no signals
 const _NSIG = 0
 
