@@ -2572,6 +2572,8 @@ func TestPipeThreads(t *testing.T) {
 		t.Skip("skipping on Plan 9; does not support runtime poller")
 	case "js":
 		t.Skip("skipping on js; no support for os.Pipe")
+	case "wasip1":
+		t.Skip("skipping on wasip1; no support for os.Pipe")
 	}
 
 	threads := 100
