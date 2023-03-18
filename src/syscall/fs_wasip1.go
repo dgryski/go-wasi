@@ -83,7 +83,7 @@ const (
 	RIGHT_SOCK_SHUTDOWN
 	RIGHT_SOCK_ACCEPT
 
-	RIGHT_FULL = ^uint64(0)
+	RIGHT_FULL = __wasip1_rights_t(^uint32(0))
 
 	WHENCE_SET = 0
 	WHENCE_CUR = 1
@@ -404,6 +404,10 @@ func init() {
 // Provided by package runtime.
 func now() (sec int64, nsec int32)
 
+func hasPrefix(s, p string) bool {
+	return len(s) >= len(p) && s[:len(p)] == p
+}
+
 func joinPath(dir, file string) string {
 	i := 0
 	for i < len(file) && file[i] == '/' {
@@ -423,12 +427,16 @@ func preparePath(path string) (__wasip1_fd_t, string, *byte, size_t) {
 	if len(path) == 0 || path[0] != '/' {
 		dirfd = cwd.fd
 		dirname = cwd.name
-	} else if len(preopens) > 0 {
-		dirfd = preopens[0].fd
-		dirname = preopens[0].name
 	} else {
 		dirfd = ^__wasip1_fd_t(0)
 		dirname = "/"
+
+		for _, p := range preopens {
+			if hasPrefix(path, p.name) {
+				dirfd = p.fd
+				dirname = p.name
+			}
+		}
 	}
 
 	return dirfd, dirname, unsafe.StringData(path), size_t(len(path))
@@ -451,13 +459,13 @@ func Open(path string, openmode int, perm uint32) (int, error) {
 	}
 
 	// Remove when https://github.com/bytecodealliance/wasmtime/pull/4967 is merged.
-	// st := &Stat_t{}
-	// if err := Stat(path, st); err != nil && err != ENOENT {
-	// 	return 0, err
-	// }
-	// if st.Filetype == FILETYPE_DIRECTORY {
-	// 	oflags |= OFLAG_DIRECTORY
-	// }
+	var st Stat_t
+	if err := Stat(path, &st); err != nil && err != ENOENT {
+		return 0, err
+	}
+	if st.Filetype == FILETYPE_DIRECTORY {
+		oflags |= OFLAG_DIRECTORY
+	}
 
 	var rights = rootRightsFile
 	switch {
