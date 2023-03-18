@@ -437,6 +437,13 @@ func preparePath(path string) (__wasip1_fd_t, string, *byte, size_t) {
 				dirname = p.name
 			}
 		}
+
+		for len(path) > 0 && path[0] == '/' {
+			path = path[1:]
+		}
+		if len(path) == 0 {
+			path = "."
+		}
 	}
 
 	return dirfd, dirname, unsafe.StringData(path), size_t(len(path))
@@ -446,6 +453,7 @@ func Open(path string, openmode int, perm uint32) (int, error) {
 	if path == "" {
 		return 0, errEINVAL
 	}
+	dirfd, dirname, path_ptr, path_len := preparePath(path)
 
 	var oflags __wasip1_oflags_t
 	if openmode&O_CREATE != 0 {
@@ -460,11 +468,25 @@ func Open(path string, openmode int, perm uint32) (int, error) {
 
 	// Remove when https://github.com/bytecodealliance/wasmtime/pull/4967 is merged.
 	var st Stat_t
-	if err := Stat(path, &st); err != nil && err != ENOENT {
-		return 0, err
+	if errno := __wasip1_path_filestat_get(
+		dirfd,
+		LOOKUP_SYMLINK_FOLLOW,
+		path_ptr,
+		path_len,
+		&st,
+	); errno != 0 && errno != ENOENT {
+		return 0, errnoErr(errno)
 	}
 	if st.Filetype == FILETYPE_DIRECTORY {
 		oflags |= OFLAG_DIRECTORY
+		// WASM runtimes appear to reutrn EINVAL when passing invalid
+		// combination of flags to open directories; however, TestOpenError
+		// in the os package expects EISDIR, so we precheck this condition
+		// here to emulate the expected behavior.
+		const invalidFlags = O_WRONLY | O_RDWR | O_CREATE | O_APPEND | O_TRUNC | O_EXCL
+		if (openmode & invalidFlags) != 0 {
+			return 0, errEISDIR
+		}
 	}
 
 	var rights = rootRightsFile
@@ -494,8 +516,6 @@ func Open(path string, openmode int, perm uint32) (int, error) {
 	// TODO(achille): decide if we set rights, and if we don't we should
 	// remove the code above.
 	rights = RIGHT_FULL
-
-	dirfd, dirname, path_ptr, path_len := preparePath(path)
 
 	var fd __wasip1_fd_t
 	errno := __wasip1_path_open(
