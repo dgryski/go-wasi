@@ -175,6 +175,7 @@ var errorstr = [...]string{
 var (
 	errENOSYS error = ENOSYS
 	errEBADF  error = EBADF
+	errEISDIR error = EISDIR
 	errEAGAIN error = EAGAIN
 	errEINVAL error = EINVAL
 	errENOENT error = ENOENT
