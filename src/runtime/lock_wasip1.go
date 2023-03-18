@@ -97,7 +97,6 @@ func notetsleepg(n *note, ns int64) bool {
 }
 
 func beforeIdle(int64, int64) (*g, bool) {
-	// FIXME: see lock_js.go
 	return nil, false
 }
 
