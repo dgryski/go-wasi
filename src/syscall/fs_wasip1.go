@@ -805,7 +805,7 @@ func Link(path, link string) error {
 	new_dirfd, _, new_path, new_path_len := preparePath(link)
 	errno := __wasip1_path_link(
 		old_dirfd,
-		LOOKUP_SYMLINK_FOLLOW,
+		0,
 		old_path,
 		old_path_len,
 		new_dirfd,
