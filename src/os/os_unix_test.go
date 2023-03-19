@@ -7,6 +7,7 @@
 package os_test
 
 import (
+	"internal/testenv"
 	"io"
 	"os"
 	. "os"
@@ -136,6 +137,7 @@ func TestFileChown(t *testing.T) {
 }
 
 func TestLchown(t *testing.T) {
+	testenv.MustHaveSymlink(t)
 	t.Parallel()
 
 	// Use TempDir() to make sure we're on a local file system,

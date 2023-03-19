@@ -7,6 +7,7 @@
 package testenv
 
 import (
+	"os"
 	"runtime"
 )
 
@@ -14,7 +15,10 @@ func hasSymlink() (ok bool, reason string) {
 	switch runtime.GOOS {
 	case "android", "plan9":
 		return false, ""
+	case "wasip1":
+		if os.Getenv("RUNTIME") == "wasmtime" {
+			return false, ""
+		}
 	}
-
 	return true, ""
 }
