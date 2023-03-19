@@ -574,13 +574,7 @@ func PathOpen(path string, openmode int) (int, string, error) {
 	case O_RDONLY:
 		rights &^= writeRights
 	case O_WRONLY:
-		// TODO(achille): wazero needs to offer a mechanism for setting write
-		// permissions on open files; at this time there is none so we add the
-		// O_CREATE flag to force it.
-		oflags |= OFLAG_CREATE
 		rights &^= readRights
-	case O_RDWR:
-		oflags |= OFLAG_CREATE
 	}
 
 	var fdflags __wasip1_fdflags_t
