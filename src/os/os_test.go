@@ -105,6 +105,18 @@ var sysdir = func() *sysDir {
 				"local",
 			},
 		}
+	case "wasip1":
+		// wasmtime has issues resolving symbolic links that are often present
+		// in directories like /etc/group below (e.g. private/etc/group on OSX).
+		// For this reason we use files in the Go source tree instead.
+		return &sysDir{
+			runtime.GOROOT(),
+			[]string{
+				"go.env",
+				"LICENSE",
+				"CONTRIBUTING.md",
+			},
+		}
 	}
 	return &sysDir{
 		"/etc",
