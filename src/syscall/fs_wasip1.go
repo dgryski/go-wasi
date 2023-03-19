@@ -559,7 +559,7 @@ func PathOpen(path string, openmode int) (int, string, error) {
 	}
 	if st.Filetype == FILETYPE_DIRECTORY {
 		oflags |= OFLAG_DIRECTORY
-		// WASM runtimes appear to reutrn EINVAL when passing invalid
+		// WASM runtimes appear to return EINVAL when passing invalid
 		// combination of flags to open directories; however, TestOpenError
 		// in the os package expects EISDIR, so we precheck this condition
 		// here to emulate the expected behavior.
