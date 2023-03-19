@@ -85,16 +85,7 @@ func (f *File) readdir(n int, mode readdirMode) (names []string, dirents []DirEn
 		}
 		rec := buf[:reclen]
 		d.bufp += int(reclen)
-		ino, ok := direntIno(rec)
-		if !ok {
-			break
-		}
-		if ino == 0 {
-			//FIXME(julien): looks like in WASI inodes might be 0 ?
-			if runtime.GOOS != "wasip1" {
-				continue
-			}
-		}
+
 		const namoff = uint64(unsafe.Offsetof(syscall.Dirent{}.Name))
 		namlen, ok := direntNamlen(rec)
 		if !ok || namoff+namlen > uint64(len(rec)) {

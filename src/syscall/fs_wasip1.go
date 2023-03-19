@@ -506,7 +506,6 @@ func Open(path string, openmode int, perm uint32) (int, error) {
 
 	var fdflags __wasip1_fdflags_t
 	if openmode&O_APPEND != 0 {
-		// TODO(achille): why was this commented out?
 		fdflags |= FDFLAG_APPEND
 	}
 	if openmode&O_SYNC != 0 {
