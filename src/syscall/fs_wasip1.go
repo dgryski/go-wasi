@@ -876,42 +876,30 @@ func Fsync(fd int) error {
 
 func makeIOVec(b []byte) *__wasip1_iovec_t {
 	return &__wasip1_iovec_t{
-		buf:     uintptr_t(uintptr(unsafe.Pointer(&b[0]))),
+		buf:     uintptr_t(uintptr(unsafe.Pointer(unsafe.SliceData(b)))),
 		buf_len: size_t(len(b)),
 	}
 }
 
 func Read(fd int, b []byte) (int, error) {
-	if len(b) == 0 {
-		return 0, nil
-	}
 	var nread size_t
 	errno := __wasip1_fd_read(__wasip1_fd_t(fd), makeIOVec(b), 1, &nread)
 	return int(nread), errnoErr(errno)
 }
 
 func Write(fd int, b []byte) (int, error) {
-	if len(b) == 0 {
-		return 0, nil
-	}
 	var nwritten size_t
 	errno := __wasip1_fd_write(__wasip1_fd_t(fd), makeIOVec(b), 1, &nwritten)
 	return int(nwritten), errnoErr(errno)
 }
 
 func Pread(fd int, b []byte, offset int64) (int, error) {
-	if len(b) == 0 {
-		return 0, nil
-	}
 	var nread size_t
 	errno := __wasip1_fd_pread(__wasip1_fd_t(fd), makeIOVec(b), 1, __wasip1_filesize_t(offset), &nread)
 	return int(nread), errnoErr(errno)
 }
 
 func Pwrite(fd int, b []byte, offset int64) (int, error) {
-	if len(b) == 0 {
-		return 0, nil
-	}
 	var nwritten size_t
 	errno := __wasip1_fd_pwrite(__wasip1_fd_t(fd), makeIOVec(b), 1, __wasip1_filesize_t(offset), &nwritten)
 	return int(nwritten), errnoErr(errno)
@@ -936,9 +924,6 @@ func Pipe(fd []int) error {
 }
 
 func RandomGet(b []byte) error {
-	if len(b) == 0 {
-		return nil
-	}
 	errno := __wasip1_random_get(&b[0], size_t(len(b)))
 	return errnoErr(errno)
 }
