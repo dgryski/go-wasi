@@ -794,6 +794,11 @@ func Readlink(path string, buf []byte) (n int, err error) {
 		size_t(len(buf)),
 		&bufused,
 	)
+	// For some reason wasmtime returns ERANGE when the output buffer is
+	// shorter than the symbolic link value. os.Readlink expects a nil
+	// error and uses the fact that n is greater or equal to the buffer
+	// length to assume that it needs to try again with a larger size.
+	// This condition is handled in os.Readlink.
 	return int(bufused), errnoErr(errno)
 }
 
