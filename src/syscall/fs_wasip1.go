@@ -7,7 +7,6 @@
 package syscall
 
 import (
-	"sync"
 	"unsafe"
 )
 
@@ -334,9 +333,6 @@ func __wasip1_fd_prestat_dir_name(fd __wasip1_fd_t, path *byte, path_len size_t)
 var rootRightsDir __wasip1_rights_t
 var rootRightsFile __wasip1_rights_t
 
-var fdPathsMu sync.Mutex
-var fdPaths = make(map[int]string)
-
 type opendir struct {
 	fd   __wasip1_fd_t
 	name string
@@ -534,8 +530,13 @@ func preparePath(path string) (__wasip1_fd_t, string, *byte, size_t) {
 }
 
 func Open(path string, openmode int, perm uint32) (int, error) {
+	fd, _, err := PathOpen(path, openmode)
+	return fd, err
+}
+
+func PathOpen(path string, openmode int) (int, string, error) {
 	if path == "" {
-		return 0, EINVAL
+		return -1, "", EINVAL
 	}
 	dirFd, dirName, pathPtr, pathLen := preparePath(path)
 
@@ -559,7 +560,7 @@ func Open(path string, openmode int, perm uint32) (int, error) {
 		pathLen,
 		&st,
 	); errno != 0 && errno != ENOENT {
-		return 0, errnoErr(errno)
+		return -1, "", errnoErr(errno)
 	}
 	if st.Filetype == FILETYPE_DIRECTORY {
 		oflags |= OFLAG_DIRECTORY
@@ -569,7 +570,7 @@ func Open(path string, openmode int, perm uint32) (int, error) {
 		// here to emulate the expected behavior.
 		const invalidFlags = O_WRONLY | O_RDWR | O_CREATE | O_APPEND | O_TRUNC | O_EXCL
 		if (openmode & invalidFlags) != 0 {
-			return 0, EISDIR
+			return 0, "", EISDIR
 		}
 	}
 
@@ -612,22 +613,17 @@ func Open(path string, openmode int, perm uint32) (int, error) {
 		fdflags,
 		&fd,
 	)
-
-	// TODO(achille): this map is needed in order to support Fchdir and Getwd;
-	// it's kind of bad, can we find an alternative?
+	if errno != 0 {
+		return -1, "", errnoErr(errno)
+	}
+	// wasi does not offer a mechanism to duplicate file descriptor so instead
+	// emulate Fchdir by setting the current working directory to the path that
+	// the file descriptor was originally opened from.
 	path = joinPath(dirName, unsafe.String(pathPtr, pathLen))
-	fdPathsMu.Lock()
-	fdPaths[int(fd)] = path
-	fdPathsMu.Unlock()
-
-	return int(fd), errnoErr(errno)
+	return int(fd), path, errnoErr(errno)
 }
 
 func Close(fd int) error {
-	fdPathsMu.Lock()
-	delete(fdPaths, fd)
-	fdPathsMu.Unlock()
-
 	errno := __wasip1_fd_close(__wasip1_fd_t(fd))
 	return errnoErr(errno)
 }
@@ -830,22 +826,6 @@ func Chdir(path string) error {
 	}
 	cwd = path
 	return nil
-}
-
-func Fchdir(fd int) error {
-	fdPathsMu.Lock()
-	dir, ok := fdPaths[fd]
-	fdPathsMu.Unlock()
-	if !ok {
-		return EBADF
-	}
-	// wasi does not offer a mechanism to duplicate file descriptor so instead
-	// emulate Fchdir by setting the current working directory to the path that
-	// the file descriptor was originally opened from. This is necessary because
-	// we don't have ownership of the file descriptor, which might be closed
-	// after Fchdir returns and would break relataive path lookups if we had
-	// retained it.
-	return Chdir(dir)
 }
 
 func Readlink(path string, buf []byte) (n int, err error) {

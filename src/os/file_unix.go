@@ -231,9 +231,10 @@ func openFileNolog(name string, flag int, perm FileMode) (*File, error) {
 	}
 
 	var r int
+	var s poll.SysFile
 	for {
 		var e error
-		r, e = syscall.Open(name, flag|syscall.O_CLOEXEC, syscallMode(perm))
+		r, s, e = open(name, flag|syscall.O_CLOEXEC, syscallMode(perm))
 		if e == nil {
 			break
 		}
@@ -257,7 +258,9 @@ func openFileNolog(name string, flag int, perm FileMode) (*File, error) {
 		syscall.CloseOnExec(r)
 	}
 
-	return newFile(uintptr(r), name, kindOpenFile), nil
+	f := newFile(uintptr(r), name, kindOpenFile)
+	f.pfd.SysFile = s
+	return f, nil
 }
 
 func (file *file) close() error {

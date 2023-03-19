@@ -35,7 +35,7 @@ func (fd *FD) ReadDir(buf []byte, cookie syscall.Dircookie) (int, error) {
 }
 
 func (fd *FD) ReadDirent(buf []byte) (int, error) {
-	n, err := fd.ReadDir(buf, fd.next)
+	n, err := fd.ReadDir(buf, fd.Dircookie)
 	if err != nil {
 		return 0, err
 	}
@@ -60,7 +60,7 @@ func (fd *FD) ReadDirent(buf []byte) (int, error) {
 		if size > uint64(len(b)) {
 			break
 		}
-		fd.next = syscall.Dircookie(next)
+		fd.Dircookie = syscall.Dircookie(next)
 		b = b[size:]
 	}
 
