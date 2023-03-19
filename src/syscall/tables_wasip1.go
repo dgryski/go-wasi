@@ -190,9 +190,6 @@ var (
 //go:noinline
 //go:nosplit
 func errnoErr(e Errno) error {
-	if e == 0 {
-		return nil
-	}
 	switch e {
 	case 0:
 		return nil
