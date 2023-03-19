@@ -399,8 +399,7 @@ func Readlink(name string) (string, error) {
 				break
 			}
 		}
-		// buffer too small
-		if runtime.GOOS == "aix" && e == syscall.ERANGE {
+		if (runtime.GOOS == "aix" || runtime.GOOS == "wasip1") && e == syscall.ERANGE {
 			continue
 		}
 		if e != nil {
