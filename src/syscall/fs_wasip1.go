@@ -602,9 +602,6 @@ func PathOpen(path string, openmode int) (int, string, error) {
 	if errno != 0 {
 		return -1, "", errnoErr(errno)
 	}
-	// wasi does not offer a mechanism to duplicate file descriptor so instead
-	// emulate Fchdir by setting the current working directory to the path that
-	// the file descriptor was originally opened from.
 	path = joinPath(dirName, unsafe.String(pathPtr, pathLen))
 	return int(fd), path, errnoErr(errno)
 }
