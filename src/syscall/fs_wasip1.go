@@ -406,11 +406,8 @@ func init() {
 // Provided by package runtime.
 func now() (sec int64, nsec int32)
 
+//go:nosplit
 func appendCleanPath(buf []byte, path string, lookupParent bool) ([]byte, bool) {
-	if len(buf) == 0 && isAbs(path) {
-		buf = append(buf, '/')
-	}
-
 	for i := 0; i < len(path); {
 		for i < len(path) && path[i] == '/' {
 			i++
@@ -421,13 +418,16 @@ func appendCleanPath(buf []byte, path string, lookupParent bool) ([]byte, bool) 
 			j++
 		}
 
-		switch s := string(path[i:j]); s {
+		s := path[i:j]
+		i = j
+
+		switch s {
 		case "":
+			continue
 		case ".":
+			continue
 		case "..":
-			if lookupParent {
-				buf = append(buf, '/', '.', '.')
-			} else {
+			if !lookupParent {
 				k := len(buf)
 				for k > 0 && buf[k-1] != '/' {
 					k--
@@ -438,24 +438,40 @@ func appendCleanPath(buf []byte, path string, lookupParent bool) ([]byte, bool) 
 				buf = buf[:k]
 				if k == 0 {
 					lookupParent = true
-					buf = append(buf, '.', '.')
+				} else {
+					s = ""
+					continue
 				}
 			}
 		default:
-			if len(buf) > 0 && buf[len(buf)-1] != '/' {
-				buf = append(buf, '/')
-			}
-			buf = append(buf, s...)
 			lookupParent = false
 		}
 
-		i = j
+		if len(buf) > 0 && buf[len(buf)-1] != '/' {
+			buf = append(buf, '/')
+		}
+		buf = append(buf, s...)
 	}
 	return buf, lookupParent
 }
 
+// joinPath concatenates dir and file paths, producing a cleaned path where
+// "." and ".." have been removed, unless dir is relative and the references
+// to parent directories in file represented a location relatie to a parent
+// of dir.
+//
+// This function is used for path resolution of all wasi functions expecting
+// a path argument; the returned string is heap allocated, which we may want
+// to optimize in the future. Instead of returning a string, the function
+// could append the result to an output buffer that the functions in this
+// file can manage to have allocated on the stack (e.g. initializing to a
+// fixed capacity). Since it will significantly increase code complexity,
+// we prefer to optimize for readability and maintainability at this time.
 func joinPath(dir, file string) string {
-	buf := make([]byte, 0, len(dir)+len(file))
+	buf := make([]byte, 0, len(dir)+len(file)+1)
+	if isAbs(dir) {
+		buf = append(buf, '/')
+	}
 	buf, lookupParent := appendCleanPath(buf, dir, false)
 	buf, _ = appendCleanPath(buf, file, lookupParent)
 	// The appendCleanPath function cleans the path so it does not inject
@@ -491,12 +507,14 @@ func hasSuffix(s, x string) bool {
 }
 
 func preparePath(path string) (__wasip1_fd_t, string, *byte, size_t) {
-	if !isAbs(path) {
-		path = joinPath(cwd, path)
-	}
-
 	var dirFd = ^__wasip1_fd_t(0)
 	var dirName string
+
+	dir := "/"
+	if !isAbs(path) {
+		dir = cwd
+	}
+	path = joinPath(dir, path)
 
 	for _, p := range preopens {
 		if len(p.name) > len(dirName) && hasPrefix(path, p.name) {
@@ -517,7 +535,7 @@ func preparePath(path string) (__wasip1_fd_t, string, *byte, size_t) {
 
 func Open(path string, openmode int, perm uint32) (int, error) {
 	if path == "" {
-		return 0, errEINVAL
+		return 0, EINVAL
 	}
 	dirFd, dirName, pathPtr, pathLen := preparePath(path)
 
@@ -551,7 +569,7 @@ func Open(path string, openmode int, perm uint32) (int, error) {
 		// here to emulate the expected behavior.
 		const invalidFlags = O_WRONLY | O_RDWR | O_CREATE | O_APPEND | O_TRUNC | O_EXCL
 		if (openmode & invalidFlags) != 0 {
-			return 0, errEISDIR
+			return 0, EISDIR
 		}
 	}
 
@@ -620,7 +638,7 @@ func CloseOnExec(fd int) {
 
 func Mkdir(path string, perm uint32) error {
 	if path == "" {
-		return errEINVAL
+		return EINVAL
 	}
 	dirFd, _, pathPtr, pathLen := preparePath(path)
 	errno := __wasip1_path_create_directory(dirFd, pathPtr, pathLen)
@@ -652,7 +670,7 @@ type Stat_t struct {
 
 func Stat(path string, st *Stat_t) error {
 	if path == "" {
-		return errEINVAL
+		return EINVAL
 	}
 	dirFd, _, pathPtr, pathLen := preparePath(path)
 	errno := __wasip1_path_filestat_get(dirFd, LOOKUP_SYMLINK_FOLLOW, pathPtr, pathLen, st)
@@ -662,7 +680,7 @@ func Stat(path string, st *Stat_t) error {
 
 func Lstat(path string, st *Stat_t) error {
 	if path == "" {
-		return errEINVAL
+		return EINVAL
 	}
 	dirFd, _, pathPtr, pathLen := preparePath(path)
 	errno := __wasip1_path_filestat_get(dirFd, 0, pathPtr, pathLen, st)
@@ -689,7 +707,7 @@ func setDefaultMode(st *Stat_t) {
 
 func Unlink(path string) error {
 	if path == "" {
-		return errEINVAL
+		return EINVAL
 	}
 	dirFd, _, pathPtr, pathLen := preparePath(path)
 	errno := __wasip1_path_unlink_file(dirFd, pathPtr, pathLen)
@@ -698,7 +716,7 @@ func Unlink(path string) error {
 
 func Rmdir(path string) error {
 	if path == "" {
-		return errEINVAL
+		return EINVAL
 	}
 	dirFd, _, pathPtr, pathLen := preparePath(path)
 	errno := __wasip1_path_remove_directory(dirFd, pathPtr, pathLen)
@@ -716,20 +734,20 @@ func Fchmod(fd int, mode uint32) error {
 }
 
 func Chown(path string, uid, gid int) error {
-	return errENOSYS
+	return ENOSYS
 }
 
 func Fchown(fd int, uid, gid int) error {
-	return errENOSYS
+	return ENOSYS
 }
 
 func Lchown(path string, uid, gid int) error {
-	return errENOSYS
+	return ENOSYS
 }
 
 func UtimesNano(path string, ts []Timespec) error {
 	if path == "" {
-		return errEINVAL
+		return EINVAL
 	}
 	dirFd, _, pathPtr, pathLen := preparePath(path)
 	errno := __wasip1_path_filestat_set_times(
@@ -746,7 +764,7 @@ func UtimesNano(path string, ts []Timespec) error {
 
 func Rename(from, to string) error {
 	if from == "" || to == "" {
-		return errEINVAL
+		return EINVAL
 	}
 	oldDirFd, _, oldPathPtr, oldPathLen := preparePath(from)
 	newDirFd, _, newPathPtr, newPathLen := preparePath(to)
@@ -763,7 +781,7 @@ func Rename(from, to string) error {
 
 func Truncate(path string, length int64) error {
 	if path == "" {
-		return errEINVAL
+		return EINVAL
 	}
 	// We use O_APPEND here because it is the only way to get wazero to set the
 	// O_RDWR open flag on the open file, which is needed to truncate ta file,
@@ -792,7 +810,7 @@ func Getwd() (string, error) {
 
 func Chdir(path string) error {
 	if path == "" {
-		return errEINVAL
+		return EINVAL
 	}
 
 	dir := "/"
@@ -819,7 +837,7 @@ func Fchdir(fd int) error {
 	dir, ok := fdPaths[fd]
 	fdPathsMu.Unlock()
 	if !ok {
-		return errEBADF
+		return EBADF
 	}
 	// wasi does not offer a mechanism to duplicate file descriptor so instead
 	// emulate Fchdir by setting the current working directory to the path that
@@ -832,7 +850,7 @@ func Fchdir(fd int) error {
 
 func Readlink(path string, buf []byte) (n int, err error) {
 	if path == "" {
-		return 0, errEINVAL
+		return 0, EINVAL
 	}
 	if len(buf) == 0 {
 		return 0, nil
@@ -857,7 +875,7 @@ func Readlink(path string, buf []byte) (n int, err error) {
 
 func Link(path, link string) error {
 	if path == "" || link == "" {
-		return errEINVAL
+		return EINVAL
 	}
 	oldDirFd, _, oldPathPtr, oldPathLen := preparePath(path)
 	newDirFd, _, newPathPtr, newPathLen := preparePath(link)
@@ -875,7 +893,7 @@ func Link(path, link string) error {
 
 func Symlink(path, link string) error {
 	if path == "" || link == "" {
-		return errEINVAL
+		return EINVAL
 	}
 	dirFd, _, pathPtr, pathlen := preparePath(link)
 	errno := __wasip1_path_symlink(
@@ -943,15 +961,15 @@ func Seek(fd int, offset int64, whence int) (int64, error) {
 }
 
 func Dup(fd int) (int, error) {
-	return 0, errENOSYS
+	return 0, ENOSYS
 }
 
 func Dup2(fd, newfd int) error {
-	return errENOSYS
+	return ENOSYS
 }
 
 func Pipe(fd []int) error {
-	return errENOSYS
+	return ENOSYS
 }
 
 func RandomGet(b []byte) error {
