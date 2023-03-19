@@ -9,7 +9,6 @@ package syscall
 import (
 	"internal/itoa"
 	"internal/oserror"
-	"sync"
 	"unsafe"
 )
 
@@ -54,13 +53,11 @@ func direntNamlen(buf []byte) (uint64, bool) {
 	return readInt(buf, unsafe.Offsetof(Dirent{}.Namlen), unsafe.Sizeof(Dirent{}.Namlen))
 }
 
-const PathMax = 256
-
 // An Errno is an unsigned number describing an error condition.
 // It implements the error interface. The zero Errno is by convention
 // a non-error, so code to convert from Errno to error should use:
 //
-//	err = nil
+//	var err = nil
 //	if errno != 0 {
 //		err = errno
 //	}
@@ -98,33 +95,112 @@ func (e Errno) Timeout() bool {
 
 // A Signal is a number describing a process signal.
 // It implements the os.Signal interface.
-type Signal int
+type Signal uint8
 
 const (
-	_ Signal = iota
-	SIGCHLD
+	SIGNONE Signal = iota
+	SIGHUP
 	SIGINT
-	SIGKILL
-	SIGTRAP
 	SIGQUIT
+	SIGILL
+	SIGTRAP
+	SIGABRT
+	SIGBUS
+	SIGFPE
+	SIGKILL
+	SIGUSR1
+	SIGSEGV
+	SIGUSR2
+	SIGPIPE
+	SIGALRM
 	SIGTERM
+	SIGCHLD
+	SIGCONT
+	SIGSTOP
+	SIGTSTP
+	SIGTTIN
+	SIGTTOU
+	SIGURG
+	SIGXCPU
+	SIGXFSZ
+	SIGVTARLM
+	SIGPROF
+	SIGWINCH
+	SIGPOLL
+	SIGPWR
+	SIGSYS
 )
 
 func (s Signal) Signal() {}
 
 func (s Signal) String() string {
-	if 0 <= s && int(s) < len(signals) {
-		str := signals[s]
-		if str != "" {
-			return str
-		}
+	switch s {
+	case SIGNONE:
+		return "no signal"
+	case SIGHUP:
+		return "hangup"
+	case SIGINT:
+		return "interrupt"
+	case SIGQUIT:
+		return "quit"
+	case SIGILL:
+		return "illegal instruction"
+	case SIGTRAP:
+		return "trace/breakpoint trap"
+	case SIGABRT:
+		return "abort"
+	case SIGBUS:
+		return "bus error"
+	case SIGFPE:
+		return "floating point exception"
+	case SIGKILL:
+		return "killed"
+	case SIGUSR1:
+		return "user defined signal 1"
+	case SIGSEGV:
+		return "segmentation fault"
+	case SIGUSR2:
+		return "user defined signal 2"
+	case SIGPIPE:
+		return "broken pipe"
+	case SIGALRM:
+		return "alarm clock"
+	case SIGTERM:
+		return "terminated"
+	case SIGCHLD:
+		return "child exited"
+	case SIGCONT:
+		return "continued"
+	case SIGSTOP:
+		return "stopped (signal)"
+	case SIGTSTP:
+		return "stopped"
+	case SIGTTIN:
+		return "stopped (tty input)"
+	case SIGTTOU:
+		return "stopped (tty output)"
+	case SIGURG:
+		return "urgent I/O condition"
+	case SIGXCPU:
+		return "CPU time limit exceeded"
+	case SIGXFSZ:
+		return "file size limit exceeded"
+	case SIGVTARLM:
+		return "virtual timer expired"
+	case SIGPROF:
+		return "profiling timer expired"
+	case SIGWINCH:
+		return "window changed"
+	case SIGPOLL:
+		return "I/O possible"
+	case SIGPWR:
+		return "power failure"
+	case SIGSYS:
+		return "bad system call"
+	default:
+		return "signal " + itoa.Itoa(int(s))
 	}
-	return "signal " + itoa.Itoa(int(s))
 }
-
-var signals = [...]string{}
-
-// File system
 
 const (
 	Stdin  = 0
@@ -214,11 +290,6 @@ const (
 	S_IXOTH = 01
 )
 
-// Processes
-// Not supported - just enough for package os.
-
-var ForkLock sync.RWMutex
-
 type WaitStatus uint32
 
 func (w WaitStatus) Exited() bool       { return false }
@@ -231,13 +302,19 @@ func (w WaitStatus) Continued() bool    { return false }
 func (w WaitStatus) StopSignal() Signal { return 0 }
 func (w WaitStatus) TrapCause() int     { return 0 }
 
-// XXX made up
+// Rusage is a placeholder to allow compilation of the os/exec package
+// because we need Go programs to be portable across platforms. WASI does
+// not have a mechanism to to spawn processes so there is no reason for an
+// application to take a dependency on this type.
 type Rusage struct {
 	Utime Timeval
 	Stime Timeval
 }
 
-// XXX made up
+// ProcAttr is a placeholder to allow compilation of the os/exec package
+// because we need Go programs to be portable across platforms. WASI does
+// not have a mechanism to to spawn processes so there is no reason for an
+// application to take a dependency on this type.
 type ProcAttr struct {
 	Dir   string
 	Env   []string
@@ -325,15 +402,9 @@ func Wait4(pid int, wstatus *WaitStatus, options int, rusage *Rusage) (wpid int,
 	return 0, ENOSYS
 }
 
-// TODO(achille): figure out how to do umask emulation?
-var umask int
-
 func Umask(mask int) int {
-	umask, mask = mask, umask
-	return mask
+	return 0
 }
-
-type Iovec struct{} // dummy
 
 type Timespec struct {
 	Sec  int64

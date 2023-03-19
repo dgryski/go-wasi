@@ -26,3 +26,9 @@ type SysFile struct {
 	// result from the Filetype field. We would need to ensure that Filetype is
 	// always set instead of being lazily initialized.
 }
+
+// dupCloseOnExecOld always errors on wasip1 because there is no mechanism to
+// duplicate file descriptors.
+func dupCloseOnExecOld(fd int) (int, string, error) {
+	return -1, "dup", syscall.ENOSYS
+}

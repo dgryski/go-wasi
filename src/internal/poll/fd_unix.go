@@ -28,9 +28,6 @@ type FD struct {
 	// I/O poller.
 	pd pollDesc
 
-	// Writev cache.
-	iovecs *[]syscall.Iovec
-
 	// Semaphore signaled when file is closed.
 	csema uint32
 
@@ -671,19 +668,6 @@ func DupCloseOnExec(fd int) (int, string, error) {
 		}
 	}
 	return dupCloseOnExecOld(fd)
-}
-
-// dupCloseOnExecOld is the traditional way to dup an fd and
-// set its O_CLOEXEC bit, using two system calls.
-func dupCloseOnExecOld(fd int) (int, string, error) {
-	syscall.ForkLock.RLock()
-	defer syscall.ForkLock.RUnlock()
-	newfd, err := syscall.Dup(fd)
-	if err != nil {
-		return -1, "dup", err
-	}
-	syscall.CloseOnExec(newfd)
-	return newfd, "", nil
 }
 
 // Dup duplicates the file descriptor.
