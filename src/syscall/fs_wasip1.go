@@ -784,6 +784,9 @@ func Readlink(path string, buf []byte) (n int, err error) {
 	if path == "" {
 		return 0, errEINVAL
 	}
+	if len(buf) == 0 {
+		return 0, nil
+	}
 	dirfd, _, path_ptr, path_len := preparePath(path)
 	var bufused size_t
 	errno := __wasip1_path_readlink(
