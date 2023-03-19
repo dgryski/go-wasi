@@ -82,8 +82,6 @@ const (
 	RIGHT_SOCK_SHUTDOWN
 	RIGHT_SOCK_ACCEPT
 
-	RIGHT_FULL = __wasip1_rights_t(^uint32(0))
-
 	WHENCE_SET = 0
 	WHENCE_CUR = 1
 	WHENCE_END = 2
@@ -92,6 +90,14 @@ const (
 	FILESTAT_SET_ATIM_NOW = 0x0002
 	FILESTAT_SET_MTIM     = 0x0004
 	FILESTAT_SET_MTIM_NOW = 0x0008
+)
+
+const (
+	// Despite the rights being defined as a 64 bits integer in the spec,
+	// wasmtime crashes the program if we set any of the upper 32 bits.
+	fullRights  = __wasip1_rights_t(^uint32(0))
+	readRights  = __wasip1_rights_t(RIGHT_FD_READ | RIGHT_FD_READDIR)
+	writeRights = __wasip1_rights_t(RIGHT_FD_DATASYNC | RIGHT_FD_WRITE | RIGHT_FD_ALLOCATE | RIGHT_PATH_FILESTAT_SET_SIZE)
 )
 
 // https://github.com/WebAssembly/WASI/blob/a2b96e81c0586125cc4dc79a5be0b78d9a059925/legacy/preview1/docs.md#-fd_closefd-fd---result-errno
@@ -330,9 +336,6 @@ func __wasip1_fd_prestat_get(fd __wasip1_fd_t, prestat *__wasip1_prestat) Errno
 //go:noescape
 func __wasip1_fd_prestat_dir_name(fd __wasip1_fd_t, path *byte, path_len size_t) Errno
 
-var rootRightsDir __wasip1_rights_t
-var rootRightsFile __wasip1_rights_t
-
 type opendir struct {
 	fd   __wasip1_fd_t
 	name string
@@ -384,19 +387,11 @@ func init() {
 		})
 	}
 
-	if len(preopens) > 0 {
-		var stat __wasip1_fdstat_t
-		errno := __wasip1_fd_fdstat_get(preopens[0].fd, &stat)
-		if errno != 0 {
-			panic("fd_fdstat_get: " + errno.Error())
-		}
+	if cwd, _ = Getenv("PWD"); cwd != "" {
+		cwd = joinPath("/", cwd)
+	} else if len(preopens) > 0 {
 		cwd = preopens[0].name
-		rootRightsDir = stat.RightsBase
-		rootRightsFile = stat.RightsInheriting
 	}
-
-	cwd, _ = Getenv("PWD")
-	cwd = joinPath("/", cwd)
 }
 
 // Provided by package runtime.
@@ -541,13 +536,14 @@ func PathOpen(path string, openmode int) (int, string, error) {
 	dirFd, dirName, pathPtr, pathLen := preparePath(path)
 
 	var oflags __wasip1_oflags_t
-	if openmode&O_CREATE != 0 {
+	var rights __wasip1_rights_t = fullRights
+	if (openmode & O_CREATE) != 0 {
 		oflags |= OFLAG_CREATE
 	}
-	if openmode&O_TRUNC != 0 {
+	if (openmode & O_TRUNC) != 0 {
 		oflags |= OFLAG_TRUNC
 	}
-	if openmode&O_EXCL != 0 {
+	if (openmode & O_EXCL) != 0 {
 		oflags |= OFLAG_EXCL
 	}
 
@@ -574,32 +570,26 @@ func PathOpen(path string, openmode int) (int, string, error) {
 		}
 	}
 
-	var rights = rootRightsFile
-	switch {
-	case openmode&O_WRONLY != 0:
-		rights &^= RIGHT_FD_READ | RIGHT_FD_READDIR
+	switch openmode & (O_RDONLY | O_WRONLY | O_RDWR) {
+	case O_RDONLY:
+		rights &^= writeRights
+	case O_WRONLY:
 		// TODO(achille): wazero needs to offer a mechanism for setting write
 		// permissions on open files; at this time there is none so we add the
 		// O_CREATE flag to force it.
 		oflags |= OFLAG_CREATE
-	case openmode&O_RDWR != 0:
-		// no rights to remove
+		rights &^= readRights
+	case O_RDWR:
 		oflags |= OFLAG_CREATE
-	default:
-		rights &^= RIGHT_FD_DATASYNC | RIGHT_FD_WRITE | RIGHT_FD_ALLOCATE | RIGHT_PATH_FILESTAT_SET_SIZE
 	}
 
 	var fdflags __wasip1_fdflags_t
-	if openmode&O_APPEND != 0 {
+	if (openmode & O_APPEND) != 0 {
 		fdflags |= FDFLAG_APPEND
 	}
-	if openmode&O_SYNC != 0 {
+	if (openmode & O_SYNC) != 0 {
 		fdflags |= FDFLAG_SYNC
 	}
-
-	// TODO(achille): decide if we set rights, and if we don't we should
-	// remove the code above.
-	rights = RIGHT_FULL
 
 	var fd __wasip1_fd_t
 	errno := __wasip1_path_open(
@@ -609,7 +599,7 @@ func PathOpen(path string, openmode int) (int, string, error) {
 		pathLen,
 		oflags,
 		rights,
-		rootRightsFile,
+		fullRights,
 		fdflags,
 		&fd,
 	)
