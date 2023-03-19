@@ -347,11 +347,13 @@ type opendir struct {
 // seen as mount points at sub paths of the root.
 var preopens []opendir
 
-// File descriptor for the current working directory, defaults to the fd of the
-// root directory which is expected to be the first preopen.
-var cwd = opendir{
-	fd: ^__wasip1_fd_t(0),
-}
+// Current working directory. We maintain this as a string and resolve paths in
+// the code because wasmtime does not allow relative path lookups outside of the
+// scope of a directory; a previous approach we tried consisted in maintaining
+// open a file descriptor to the current directory so we could perform relative
+// path lookups from that location, but it resulted in breaking path resolution
+// from the current directory to its parent.
+var cwd string
 
 func init() {
 	dirNameBuf := make([]byte, 256)
@@ -392,75 +394,132 @@ func init() {
 		if errno != 0 {
 			panic("fd_fdstat_get: " + errno.Error())
 		}
-		cwd = preopens[0]
+		cwd = preopens[0].name
 		rootRightsDir = stat.RightsBase
 		rootRightsFile = stat.RightsInheriting
 	}
 
-	pwd, _ := Getenv("PWD")
-	Chdir(pwd)
+	cwd, _ = Getenv("PWD")
+	cwd = joinPath("/", cwd)
 }
 
 // Provided by package runtime.
 func now() (sec int64, nsec int32)
 
+func appendCleanPath(buf []byte, path string, lookupParent bool) ([]byte, bool) {
+	if len(buf) == 0 && isAbs(path) {
+		buf = append(buf, '/')
+	}
+
+	for i := 0; i < len(path); {
+		for i < len(path) && path[i] == '/' {
+			i++
+		}
+
+		j := i
+		for j < len(path) && path[j] != '/' {
+			j++
+		}
+
+		switch s := string(path[i:j]); s {
+		case "":
+		case ".":
+		case "..":
+			if lookupParent {
+				buf = append(buf, '/', '.', '.')
+			} else {
+				k := len(buf)
+				for k > 0 && buf[k-1] != '/' {
+					k--
+				}
+				for k > 1 && buf[k-1] == '/' {
+					k--
+				}
+				buf = buf[:k]
+				if k == 0 {
+					lookupParent = true
+					buf = append(buf, '.', '.')
+				}
+			}
+		default:
+			if len(buf) > 0 && buf[len(buf)-1] != '/' {
+				buf = append(buf, '/')
+			}
+			buf = append(buf, s...)
+			lookupParent = false
+		}
+
+		i = j
+	}
+	return buf, lookupParent
+}
+
+func joinPath(dir, file string) string {
+	buf := make([]byte, 0, len(dir)+len(file))
+	buf, lookupParent := appendCleanPath(buf, dir, false)
+	buf, _ = appendCleanPath(buf, file, lookupParent)
+	// The appendCleanPath function cleans the path so it does not inject
+	// references to the current directory. If both the dir and file args
+	// were ".", this results in the output buffer being empty so we handle
+	// this condition here.
+	if len(buf) == 0 {
+		buf = append(buf, '.')
+	}
+	// If the file ended with a '/' we make sure that the output also ends
+	// with a '/'. This is needed to ensure that programs have a mechanism
+	// to represent dereferencing symbolic links pointing to directories.
+	if len(buf) > 0 && buf[len(buf)-1] != '/' && isDir(file) {
+		buf = append(buf, '/')
+	}
+	return *(*string)(unsafe.Pointer(&buf))
+}
+
+func isAbs(path string) bool {
+	return hasPrefix(path, "/")
+}
+
+func isDir(path string) bool {
+	return hasSuffix(path, "/")
+}
+
 func hasPrefix(s, p string) bool {
 	return len(s) >= len(p) && s[:len(p)] == p
 }
 
-func trimPrefix(s, p string) string {
-	if hasPrefix(s, p) {
-		s = s[len(p):]
-	}
-	return s
-}
-
-func joinPath(dir, file string) string {
-	i := 0
-	for i < len(file) && file[i] == '/' {
-		i++
-	}
-	file = file[i:]
-	if dir == "/" {
-		return dir + file
-	}
-	return dir + "/" + file
+func hasSuffix(s, x string) bool {
+	return len(s) >= len(x) && s[len(s)-len(x):] == x
 }
 
 func preparePath(path string) (__wasip1_fd_t, string, *byte, size_t) {
-	var dirfd __wasip1_fd_t
-	var dirname string
+	if !isAbs(path) {
+		path = joinPath(cwd, path)
+	}
 
-	if len(path) == 0 || path[0] != '/' {
-		dirfd = cwd.fd
-		dirname = cwd.name
-	} else {
-		dirfd = ^__wasip1_fd_t(0)
-		dirname = "/"
+	var dirFd = ^__wasip1_fd_t(0)
+	var dirName string
 
-		for _, p := range preopens {
-			if len(p.name) >= len(dirname) && hasPrefix(path, p.name) {
-				dirfd, dirname = p.fd, p.name
-			}
-		}
-
-		path = trimPrefix(path, dirname)
-		for len(path) > 0 && path[0] == '/' {
-			path = path[1:]
-		}
-		if len(path) == 0 {
-			path = "."
+	for _, p := range preopens {
+		if len(p.name) > len(dirName) && hasPrefix(path, p.name) {
+			dirFd, dirName = p.fd, p.name
 		}
 	}
 
-	return dirfd, dirname, unsafe.StringData(path), size_t(len(path))
+	path = path[len(dirName):]
+	for isAbs(path) {
+		path = path[1:]
+	}
+	if len(path) == 0 {
+		path = "."
+	}
+
+	return dirFd, dirName, unsafe.StringData(path), size_t(len(path))
 }
 
 func Open(path string, openmode int, perm uint32) (int, error) {
 	if path == "" {
 		return 0, errEINVAL
 	}
-	dirfd, dirname, path_ptr, path_len := preparePath(path)
+	dirFd, dirName, pathPtr, pathLen := preparePath(path)
 
 	var oflags __wasip1_oflags_t
 	if openmode&O_CREATE != 0 {
@@ -476,10 +535,10 @@ func Open(path string, openmode int, perm uint32) (int, error) {
 	// Remove when https://github.com/bytecodealliance/wasmtime/pull/4967 is merged.
 	var st Stat_t
 	if errno := __wasip1_path_filestat_get(
-		dirfd,
+		dirFd,
 		LOOKUP_SYMLINK_FOLLOW,
-		path_ptr,
-		path_len,
+		pathPtr,
+		pathLen,
 		&st,
 	); errno != 0 && errno != ENOENT {
 		return 0, errnoErr(errno)
@@ -525,10 +584,10 @@ func Open(path string, openmode int, perm uint32) (int, error) {
 
 	var fd __wasip1_fd_t
 	errno := __wasip1_path_open(
-		dirfd,
+		dirFd,
 		LOOKUP_SYMLINK_FOLLOW,
-		path_ptr,
-		path_len,
+		pathPtr,
+		pathLen,
 		oflags,
 		rights,
 		rootRightsFile,
@@ -538,7 +597,7 @@ func Open(path string, openmode int, perm uint32) (int, error) {
 
 	// TODO(achille): this map is needed in order to support Fchdir and Getwd;
 	// it's kind of bad, can we find an alternative?
-	path = joinPath(dirname, path)
+	path = joinPath(dirName, unsafe.String(pathPtr, pathLen))
 	fdPathsMu.Lock()
 	fdPaths[int(fd)] = path
 	fdPathsMu.Unlock()
@@ -563,8 +622,8 @@ func Mkdir(path string, perm uint32) error {
 	if path == "" {
 		return errEINVAL
 	}
-	dirfd, _, path_ptr, path_len := preparePath(path)
-	errno := __wasip1_path_create_directory(dirfd, path_ptr, path_len)
+	dirFd, _, pathPtr, pathLen := preparePath(path)
+	errno := __wasip1_path_create_directory(dirFd, pathPtr, pathLen)
 	return errnoErr(errno)
 }
 
@@ -595,8 +654,8 @@ func Stat(path string, st *Stat_t) error {
 	if path == "" {
 		return errEINVAL
 	}
-	dirfd, _, path_ptr, path_len := preparePath(path)
-	errno := __wasip1_path_filestat_get(dirfd, LOOKUP_SYMLINK_FOLLOW, path_ptr, path_len, st)
+	dirFd, _, pathPtr, pathLen := preparePath(path)
+	errno := __wasip1_path_filestat_get(dirFd, LOOKUP_SYMLINK_FOLLOW, pathPtr, pathLen, st)
 	setDefaultMode(st)
 	return errnoErr(errno)
 }
@@ -605,8 +664,8 @@ func Lstat(path string, st *Stat_t) error {
 	if path == "" {
 		return errEINVAL
 	}
-	dirfd, _, path_ptr, path_len := preparePath(path)
-	errno := __wasip1_path_filestat_get(dirfd, 0, path_ptr, path_len, st)
+	dirFd, _, pathPtr, pathLen := preparePath(path)
+	errno := __wasip1_path_filestat_get(dirFd, 0, pathPtr, pathLen, st)
 	setDefaultMode(st)
 	return errnoErr(errno)
 }
@@ -632,8 +691,8 @@ func Unlink(path string) error {
 	if path == "" {
 		return errEINVAL
 	}
-	dirfd, _, path_ptr, path_len := preparePath(path)
-	errno := __wasip1_path_unlink_file(dirfd, path_ptr, path_len)
+	dirFd, _, pathPtr, pathLen := preparePath(path)
+	errno := __wasip1_path_unlink_file(dirFd, pathPtr, pathLen)
 	return errnoErr(errno)
 }
 
@@ -641,8 +700,8 @@ func Rmdir(path string) error {
 	if path == "" {
 		return errEINVAL
 	}
-	dirfd, _, path_ptr, path_len := preparePath(path)
-	errno := __wasip1_path_remove_directory(dirfd, path_ptr, path_len)
+	dirFd, _, pathPtr, pathLen := preparePath(path)
+	errno := __wasip1_path_remove_directory(dirFd, pathPtr, pathLen)
 	return errnoErr(errno)
 }
 
@@ -672,12 +731,12 @@ func UtimesNano(path string, ts []Timespec) error {
 	if path == "" {
 		return errEINVAL
 	}
-	dirfd, _, path_ptr, path_len := preparePath(path)
+	dirFd, _, pathPtr, pathLen := preparePath(path)
 	errno := __wasip1_path_filestat_set_times(
-		dirfd,
+		dirFd,
 		LOOKUP_SYMLINK_FOLLOW,
-		path_ptr,
-		path_len,
+		pathPtr,
+		pathLen,
 		__wasip1_timestamp_t(TimespecToNsec(ts[0])),
 		__wasip1_timestamp_t(TimespecToNsec(ts[1])),
 		FILESTAT_SET_ATIM|FILESTAT_SET_MTIM,
@@ -689,15 +748,15 @@ func Rename(from, to string) error {
 	if from == "" || to == "" {
 		return errEINVAL
 	}
-	old_dirfd, _, old_path, old_path_len := preparePath(from)
-	new_dirfd, _, new_path, new_path_len := preparePath(to)
+	oldDirFd, _, oldPathPtr, oldPathLen := preparePath(from)
+	newDirFd, _, newPathPtr, newPathLen := preparePath(to)
 	errno := __wasip1_path_rename(
-		old_dirfd,
-		old_path,
-		old_path_len,
-		new_dirfd,
-		new_path,
-		new_path_len,
+		oldDirFd,
+		oldPathPtr,
+		oldPathLen,
+		newDirFd,
+		newPathPtr,
+		newPathLen,
 	)
 	return errnoErr(errno)
 }
@@ -728,39 +787,30 @@ func Ftruncate(fd int, length int64) error {
 const ImplementsGetwd = true
 
 func Getwd() (string, error) {
-	if cwd.fd == ^__wasip1_fd_t(0) {
-		return "", errENOENT
-	}
-	return cwd.name, nil
+	return cwd, nil
 }
 
 func Chdir(path string) error {
 	if path == "" {
 		return errEINVAL
 	}
-	dirfd, dirname, path_ptr, path_len := preparePath(path)
 
-	errno := __wasip1_path_open(
-		dirfd,
-		LOOKUP_SYMLINK_FOLLOW,
-		path_ptr,
-		path_len,
-		OFLAG_DIRECTORY,
-		RIGHT_FULL,
-		RIGHT_FULL,
-		0,
-		&dirfd,
-	)
-
-	if err := errnoErr(errno); err != nil {
-		return err
+	dir := "/"
+	if !isAbs(path) {
+		dir = cwd
 	}
+	path = joinPath(dir, path)
 
-	// Note: this might be a preopen, we rely on the runtime to forbid closing
-	// of preopen file descriptors (this is validated by wasi-testsuite).
-	__wasip1_fd_close(cwd.fd)
-	cwd.fd = dirfd
-	cwd.name = joinPath(dirname, path)
+	var stat Stat_t
+	dirFd, _, pathPtr, pathLen := preparePath(path)
+	errno := __wasip1_path_filestat_get(dirFd, LOOKUP_SYMLINK_FOLLOW, pathPtr, pathLen, &stat)
+	if errno != 0 {
+		return errnoErr(errno)
+	}
+	if stat.Filetype != FILETYPE_DIRECTORY {
+		return ENOTDIR
+	}
+	cwd = path
 	return nil
 }
 
@@ -787,12 +837,12 @@ func Readlink(path string, buf []byte) (n int, err error) {
 	if len(buf) == 0 {
 		return 0, nil
 	}
-	dirfd, _, path_ptr, path_len := preparePath(path)
+	dirFd, _, pathPtr, pathLen := preparePath(path)
 	var bufused size_t
 	errno := __wasip1_path_readlink(
-		dirfd,
-		path_ptr,
-		path_len,
+		dirFd,
+		pathPtr,
+		pathLen,
 		&buf[0],
 		size_t(len(buf)),
 		&bufused,
@@ -809,16 +859,16 @@ func Link(path, link string) error {
 	if path == "" || link == "" {
 		return errEINVAL
 	}
-	old_dirfd, _, old_path, old_path_len := preparePath(path)
-	new_dirfd, _, new_path, new_path_len := preparePath(link)
+	oldDirFd, _, oldPathPtr, oldPathLen := preparePath(path)
+	newDirFd, _, newPathPtr, newPathLen := preparePath(link)
 	errno := __wasip1_path_link(
-		old_dirfd,
+		oldDirFd,
 		0,
-		old_path,
-		old_path_len,
-		new_dirfd,
-		new_path,
-		new_path_len,
+		oldPathPtr,
+		oldPathLen,
+		newDirFd,
+		newPathPtr,
+		newPathLen,
 	)
 	return errnoErr(errno)
 }
@@ -827,13 +877,13 @@ func Symlink(path, link string) error {
 	if path == "" || link == "" {
 		return errEINVAL
 	}
-	dirfd, _, new_path, new_path_len := preparePath(link)
+	dirFd, _, pathPtr, pathlen := preparePath(link)
 	errno := __wasip1_path_symlink(
 		unsafe.StringData(path),
 		size_t(len(path)),
-		dirfd,
-		new_path,
-		new_path_len,
+		dirFd,
+		pathPtr,
+		pathlen,
 	)
 	return errnoErr(errno)
 }
