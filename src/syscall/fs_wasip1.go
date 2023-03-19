@@ -536,7 +536,6 @@ func PathOpen(path string, openmode int) (int, string, error) {
 	dirFd, dirName, pathPtr, pathLen := preparePath(path)
 
 	var oflags __wasip1_oflags_t
-	var rights __wasip1_rights_t = fullRights
 	if (openmode & O_CREATE) != 0 {
 		oflags |= OFLAG_CREATE
 	}
@@ -570,11 +569,14 @@ func PathOpen(path string, openmode int) (int, string, error) {
 		}
 	}
 
+	var rights __wasip1_rights_t
 	switch openmode & (O_RDONLY | O_WRONLY | O_RDWR) {
 	case O_RDONLY:
-		rights &^= writeRights
+		rights = fullRights & ^writeRights
 	case O_WRONLY:
-		rights &^= readRights
+		rights = fullRights & ^readRights
+	default:
+		rights = fullRights
 	}
 
 	var fdflags __wasip1_fdflags_t
