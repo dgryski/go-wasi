@@ -408,6 +408,13 @@ func hasPrefix(s, p string) bool {
 	return len(s) >= len(p) && s[:len(p)] == p
 }
 
+func trimPrefix(s, p string) string {
+	if hasPrefix(s, p) {
+		s = s[len(p):]
+	}
+	return s
+}
+
 func joinPath(dir, file string) string {
 	i := 0
 	for i < len(file) && file[i] == '/' {
@@ -432,12 +439,12 @@ func preparePath(path string) (__wasip1_fd_t, string, *byte, size_t) {
 		dirname = "/"
 
 		for _, p := range preopens {
-			if hasPrefix(path, p.name) {
-				dirfd = p.fd
-				dirname = p.name
+			if len(p.name) >= len(dirname) && hasPrefix(path, p.name) {
+				dirfd, dirname = p.fd, p.name
 			}
 		}
 
+		path = trimPrefix(path, dirname)
 		for len(path) > 0 && path[0] == '/' {
 			path = path[1:]
 		}
