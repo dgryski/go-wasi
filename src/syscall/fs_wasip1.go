@@ -924,6 +924,6 @@ func Pipe(fd []int) error {
 }
 
 func RandomGet(b []byte) error {
-	errno := __wasip1_random_get(&b[0], size_t(len(b)))
+	errno := __wasip1_random_get(unsafe.SliceData(b), size_t(len(b)))
 	return errnoErr(errno)
 }
