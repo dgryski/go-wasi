@@ -40,18 +40,24 @@ type __wasip1_fdstat_t struct {
 
 const (
 	LOOKUP_SYMLINK_FOLLOW = 0x00000001
+)
 
+const (
 	OFLAG_CREATE    = 0x0001
 	OFLAG_DIRECTORY = 0x0002
 	OFLAG_EXCL      = 0x0004
 	OFLAG_TRUNC     = 0x0008
+)
 
+const (
 	FDFLAG_APPEND   = 0x0001
 	FDFLAG_DSYNC    = 0x0002
 	FDFLAG_NONBLOCK = 0x0004
 	FDFLAG_RSYNC    = 0x0008
 	FDFLAG_SYNC     = 0x0010
+)
 
+const (
 	RIGHT_FD_DATASYNC = 1 << iota
 	RIGHT_FD_READ
 	RIGHT_FD_SEEK
@@ -82,11 +88,15 @@ const (
 	RIGHT_POLL_FD_READWRITE
 	RIGHT_SOCK_SHUTDOWN
 	RIGHT_SOCK_ACCEPT
+)
 
+const (
 	WHENCE_SET = 0
 	WHENCE_CUR = 1
 	WHENCE_END = 2
+)
 
+const (
 	FILESTAT_SET_ATIM     = 0x0001
 	FILESTAT_SET_ATIM_NOW = 0x0002
 	FILESTAT_SET_MTIM     = 0x0004
@@ -576,7 +586,7 @@ func PathOpen(path string, openmode int) (int, string, error) {
 		rights = fullRights & ^writeRights
 	case O_WRONLY:
 		rights = fullRights & ^readRights
-	default:
+	case O_RDWR:
 		rights = fullRights
 	}
 
