@@ -7,6 +7,7 @@
 package syscall
 
 import (
+	"runtime"
 	"unsafe"
 )
 
@@ -884,24 +885,28 @@ func makeIOVec(b []byte) *__wasip1_iovec_t {
 func Read(fd int, b []byte) (int, error) {
 	var nread size_t
 	errno := __wasip1_fd_read(__wasip1_fd_t(fd), makeIOVec(b), 1, &nread)
+	runtime.KeepAlive(b)
 	return int(nread), errnoErr(errno)
 }
 
 func Write(fd int, b []byte) (int, error) {
 	var nwritten size_t
 	errno := __wasip1_fd_write(__wasip1_fd_t(fd), makeIOVec(b), 1, &nwritten)
+	runtime.KeepAlive(b)
 	return int(nwritten), errnoErr(errno)
 }
 
 func Pread(fd int, b []byte, offset int64) (int, error) {
 	var nread size_t
 	errno := __wasip1_fd_pread(__wasip1_fd_t(fd), makeIOVec(b), 1, __wasip1_filesize_t(offset), &nread)
+	runtime.KeepAlive(b)
 	return int(nread), errnoErr(errno)
 }
 
 func Pwrite(fd int, b []byte, offset int64) (int, error) {
 	var nwritten size_t
 	errno := __wasip1_fd_pwrite(__wasip1_fd_t(fd), makeIOVec(b), 1, __wasip1_filesize_t(offset), &nwritten)
+	runtime.KeepAlive(b)
 	return int(nwritten), errnoErr(errno)
 }
 
