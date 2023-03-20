@@ -763,13 +763,7 @@ func Truncate(path string, length int64) error {
 	if path == "" {
 		return EINVAL
 	}
-	// We use O_APPEND here because it is the only way to get wazero to set the
-	// O_RDWR open flag on the open file, which is needed to truncate ta file,
-	// see ftruncate(2):
-	//
-	//  [EINVAL] fildes is not open for writing.
-	//
-	fd, err := Open(path, O_WRONLY|O_APPEND, 0)
+	fd, err := Open(path, O_WRONLY, 0)
 	if err != nil {
 		return err
 	}
