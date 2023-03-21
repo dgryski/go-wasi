@@ -16,7 +16,8 @@ func hasSymlink() (ok bool, reason string) {
 	case "android", "plan9":
 		return false, ""
 	case "wasip1":
-		if os.Getenv("RUNTIME") == "wasmtime" {
+		switch os.Getenv("RUNTIME") {
+		case "wasmtime", "wasmedge":
 			return false, ""
 		}
 	}

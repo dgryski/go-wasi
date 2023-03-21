@@ -11,11 +11,18 @@ while [ -h "$SOURCE" ]; do
 done
 DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
 
-if [[ $RUNTIME == "wazero" ]]; then
+mkdir -p "${GOROOT}/tmp"
+case $RUNTIME in
+    wazero)
 	echo "Running with wazero: $PWD"
-	mkdir -p "${GOROOT}/tmp"
 	exec wazero run -mount /:/ -env PWD=$PWD -env GOROOT=$GOROOT -env RUNTIME=wazero -hostlogging "$LOG" $1 -- "${@:2}"
-else
+    ;;
+    wasmedge)
+    echo "Running with wasmedge: $PWD"
+    exec wasmedge --dir /:/ --env GOROOT=$GOROOT --env PWD=$PWD --env RUNTIME=wasmedge $1 "${@:2}"
+    ;;
+     *) # wasmtime
 	echo "Running with wasmtime: $PWD"
 	exec wasmtime --dir / --env GOROOT=$GOROOT --env PWD=$PWD --env RUNTIME=wasmtime --max-wasm-stack 1048576 $1 -- "${@:2}"
-fi
+    ;;
+esac
