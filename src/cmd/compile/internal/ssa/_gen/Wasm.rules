@@ -116,11 +116,11 @@
 (Cvt32Uto32F x) => (F32ConvertI32U x)
 
 // TODO(dgryski):
-(Cvt32Fto32 ...) => (I64TruncSatF32S ...)
+(Cvt32Fto32 ...) => (I32TruncSatF32S ...)
 (Cvt32Fto64 ...) => (I64TruncSatF32S ...)
-(Cvt64Fto32 ...) => (I64TruncSatF64S ...)
+(Cvt64Fto32 ...) => (I32TruncSatF64S ...)
 (Cvt64Fto64 ...) => (I64TruncSatF64S ...)
-(Cvt32Fto32U ...) => (I64TruncSatF32U ...)
+(Cvt32Fto32U ...) => (I32TruncSatF32U ...)
 (Cvt32Fto64U ...) => (I64TruncSatF32U ...)
 (Cvt64Fto32U ...) => (I64TruncSatF64U ...)
 (Cvt64Fto64U ...) => (I64TruncSatF64U ...)
@@ -143,13 +143,16 @@
 (Lsh64x(32|16|8) [c] x y) => (Lsh64x64 [c] x (ZeroExt(32|16|8)to64 y))
 
 (Lsh32x64 ...) => (Lsh64x64 ...)
-(Lsh32x(32|16|8) [c] x y) => (Lsh64x64 [c] x (ZeroExt(32|16|8)to64 y))
+(Lsh32x32 [c] x y) => (Lsh32x32 [c] x y)
+(Lsh32x(16|8) [c] x y) => (Lsh32x32 [c] x (ZeroExt(16|8)to32 y))
 
 (Lsh16x64 ...) => (Lsh64x64 ...)
-(Lsh16x(32|16|8) [c] x y) => (Lsh64x64 [c] x (ZeroExt(32|16|8)to64 y))
+(Lsh16x32 ...) => (Lsh32x32 ...)
+(Lsh16x(16|8) [c] x y) => (Lsh32x32 [c] x (ZeroExt(6|8)to32 y))
 
 (Lsh8x64 ...) => (Lsh64x64 ...)
-(Lsh8x(32|16|8) [c] x y) => (Lsh64x64 [c] x (ZeroExt(32|16|8)to64 y))
+(Lsh8x32 ...) => (Lsh32x32 ...)
+(Lsh8x(16|8) [c] x y) => (Lsh32x32 [c] x (ZeroExt(16|8)to32 y))
 
 (Rsh64Ux64 x y) && shiftIsBounded(v) => (I64ShrU x y)
 (Rsh64Ux64 x (I64Const [c])) && uint64(c) < 64 => (I64ShrU x (I64Const [c]))
@@ -354,6 +357,7 @@
 // Write barrier.
 (WB ...) => (LoweredWB ...)
 
+// TODO(dgryski): Not sure if we should default to F64 or F32 here
 // --- Intrinsics ---
 (Sqrt ...) => (F64Sqrt ...)
 (Trunc ...) => (F64Trunc ...)
@@ -466,6 +470,15 @@
 ((I64Store|I64Store32|I64Store16|I64Store8) [off] (I64AddConst [off2] ptr) val mem)
 	&& isU32Bit(off+off2) =>
 	((I64Store|I64Store32|I64Store16|I64Store8) [off+off2] ptr val mem)
+
+
+((I32Load|I32Load16U|I32Load16S|I32Load8U|I32Load8S) [off] (I32AddConst [off2] ptr) mem)
+	&& isU32Bit(off+off2) =>
+	((I32Load|I32Load16U|I32Load16S|I32Load8U|I32Load8S) [off+off2] ptr mem)
+
+((I32Store|I32Store16|I32Store8) [off] (I32AddConst [off2] ptr) val mem)
+	&& isU32Bit(off+off2) =>
+	((I32Store|I32Store16|I32Store8) [off+off2] ptr val mem)
 
 // folding offset into address
 (I32AddConst [off] (LoweredAddr {sym} [off2] base)) && isU32Bit(off+int32(off2)) =>
