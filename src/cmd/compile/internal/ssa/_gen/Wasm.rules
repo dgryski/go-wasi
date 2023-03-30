@@ -160,14 +160,23 @@
 (Rsh64Ux64 x y) => (Select (I64ShrU x y) (I64Const [0]) (I64LtU y (I64Const [64])))
 (Rsh64Ux(32|16|8) [c] x y) => (Rsh64Ux64 [c] x (ZeroExt(32|16|8)to64 y))
 
+(Rsh32Ux32 x y) && shiftIsBounded(v) => (I32ShrU x y)
+(Rsh32Ux32 x (I32Const [c])) && uint32(c) < 32 => (I32ShrU x (I32Const [c]))
+(Rsh32Ux32 x (I32Const [c])) && uint32(c) >= 32 => (I32Const [0])
+(Rsh32Ux32 x y) => (Select (I32ShrU x y) (I32Const [0]) (I32LtU y (I32Const [32])))
+(Rsh32Ux(16|8) [c] x y) => (Rsh32Ux32 [c] x (ZeroExt(16|8)to32 y))
+
 (Rsh32Ux64 [c] x y) => (Rsh64Ux64 [c] (ZeroExt32to64 x) y)
-(Rsh32Ux(32|16|8) [c] x y) => (Rsh64Ux64 [c] (ZeroExt32to64 x) (ZeroExt(32|16|8)to64 y))
+(Rsh32Ux32 [c] x y) => (Rsh32Ux32 [c] x y)
+(Rsh32Ux(16|8) [c] x y) => (Rsh32Ux32 [c] x (ZeroExt(16|8)to32 y))
 
 (Rsh16Ux64 [c] x y) => (Rsh64Ux64 [c] (ZeroExt16to64 x) y)
-(Rsh16Ux(32|16|8) [c] x y) => (Rsh64Ux64 [c] (ZeroExt16to64 x) (ZeroExt(32|16|8)to64 y))
+(Rsh16Ux32 [c] x y) => (Rsh32Ux32 [c] (ZeroExt16to32 x) y)
+(Rsh16Ux(16|8) [c] x y) => (Rsh32Ux32 [c] (ZeroExt16to32 x) (ZeroExt(16|8)to32 y))
 
 (Rsh8Ux64 [c] x y) => (Rsh64Ux64 [c] (ZeroExt8to64 x) y)
-(Rsh8Ux(32|16|8) [c] x y) => (Rsh64Ux64 [c] (ZeroExt8to64 x) (ZeroExt(32|16|8)to64 y))
+(Rsh8Ux32 [c] x y) => (Rsh32Ux32 [c] (ZeroExt8to32 x) y)
+(Rsh8Ux(16|8) [c] x y) => (Rsh32Ux32 [c] (ZeroExt8to32 x) (ZeroExt(6|8)to32 y))
 
 // Signed right shift needs to return 0/-1 if shift amount is >= width of shifted value.
 // We implement this by setting the shift value to (width - 1) if the shift value is >= width.
@@ -178,18 +187,25 @@
 (Rsh64x64 x y) => (I64ShrS x (Select <typ.Int64> y (I64Const [63]) (I64LtU y (I64Const [64]))))
 (Rsh64x(32|16|8) [c] x y) => (Rsh64x64 [c] x (ZeroExt(32|16|8)to64 y))
 
-(Rsh32x64 [c] x y) => (Rsh64x64 [c] (SignExt32to64 x) y)
-(Rsh32x(32|16|8) [c] x y) => (Rsh64x64 [c] (SignExt32to64 x) (ZeroExt(32|16|8)to64 y))
+(Rsh32x32 x y) && shiftIsBounded(v) => (I32ShrS x y)
+(Rsh32x32 x (I32Const [c])) && uint32(c) < 32 => (I32ShrS x (I32Const [c]))
+(Rsh32x32 x (I32Const [c])) && uint32(c) >= 32 => (I32ShrS x (I32Const [31]))
+(Rsh32x32 x y) => (I32ShrS x (Select <typ.Int32> y (I32Const [31]) (I32LtU y (I32Const [32]))))
 
-(Rsh16x64 [c] x y) => (Rsh64x64 [c] (SignExt16to64 x) y)
-(Rsh16x(32|16|8) [c] x y) => (Rsh64x64 [c] (SignExt16to64 x) (ZeroExt(32|16|8)to64 y))
+(Rsh32x64 [c] x y) => (Rsh64x64 [c] (SignExt32to64 x) y)
+(Rsh32x(16|8) [c] x y) => (Rsh32x32 [c] x (ZeroExt(16|8)to32 y))
+
+(Rsh16x64 [c] x y)  => (Rsh64x64 [c] (SignExt16to64 x) y)
+(Rsh16x32 [c] x y)  => (Rsh32x32 [c] (SignExt16to32 x) y)
+(Rsh16x(16|8) [c] x y) => (Rsh32x32 [c] (SignExt16to32 x) (ZeroExt(16|8)to32 y))
 
 (Rsh8x64 [c] x y)  => (Rsh64x64 [c] (SignExt8to64 x) y)
-(Rsh8x(32|16|8) [c] x y)  => (Rsh64x64 [c] (SignExt8to64 x) (ZeroExt(32|16|8)to64 y))
+(Rsh8x32 [c] x y)  => (Rsh32x32 [c] (SignExt8to32 x) (ZeroExt8to32 y))
+(Rsh8x(16|8) [c] x y)  => (Rsh32x32 [c] (SignExt8to32 x) (ZeroExt(16|8)to32 y))
 
 // Lowering rotates
-(RotateLeft8 <t> x (I64Const [c])) => (Or8 (Lsh8x64 <t> x (I64Const [c&7])) (Rsh8Ux64 <t> x (I64Const [-c&7])))
-(RotateLeft16 <t> x (I64Const [c])) => (Or16 (Lsh16x64 <t> x (I64Const [c&15])) (Rsh16Ux64 <t> x (I64Const [-c&15])))
+(RotateLeft8 <t> x (I32Const [c])) => (Or8 (Lsh8x32 <t> x (I32Const [c&7])) (Rsh8Ux32 <t> x (I32Const [-c&7])))
+(RotateLeft16 <t> x (I32Const [c])) => (Or16 (Lsh16x32 <t> x (I32Const [c&15])) (Rsh16Ux32 <t> x (I32Const [-c&15])))
 (RotateLeft32 ...) => (I32Rotl ...)
 (RotateLeft64 ...) => (I64Rotl ...)
 
