@@ -2839,9 +2839,8 @@ const (
 	OpWasmI32Clz
 	OpWasmI32Rotl
 	OpWasmI64Rotl
-	OpWasmI64Popcnt
-	OpWasmI32Rotl
 	OpWasmI32Popcnt
+	OpWasmI64Popcnt
 
 	OpAdd8
 	OpAdd16
