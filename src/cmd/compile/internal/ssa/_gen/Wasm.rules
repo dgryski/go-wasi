@@ -282,7 +282,7 @@
 		(I32Store dst (I32Load src mem) mem))
 
 (Move [s] dst src mem) && s > 4 && s < 8 =>
-	(I32Store [s-4] dst (I32Load [s-4] src mem)
+	(I32Store [int32(s-4)] dst (I32Load [int32(s-4)] src mem)
 		(I32Store dst (I32Load src mem) mem))
 
 // Large copying uses helper.
@@ -341,7 +341,7 @@
 (Const(32|16|8) [c]) => (I32Const [int32(c)])
 (Const(64|32)F ...) => (F(64|32)Const ...)
 (ConstNil) => (I32Const [0])
-(ConstBool [c]) => (I32Const [b2i(c)])
+(ConstBool [c]) => (I32Const [b2i32(c)])
 
 // Lowering calls
 (StaticCall ...) => (LoweredStaticCall ...)
@@ -489,11 +489,11 @@
 	((I32Store|I32Store16|I32Store8) [off+off2] ptr val mem)
 
 // folding offset into address
-(I32AddConst [off] (LoweredAddr {sym} [off2] base)) && isU32Bit(off+int32(off2)) =>
+(I32AddConst [off] (LoweredAddr {sym} [off2] base)) && isU32Bit(int64(off+int32(off2))) =>
 	(LoweredAddr {sym} [int32(off)+off2] base)
 (I32AddConst [off] x:(SP)) && isU32Bit(off) => (LoweredAddr [int32(off)] x) // so it is rematerializeable
 
 // transforming readonly globals into constants
-(I32Load [off] (LoweredAddr {sym} [off2] (SB)) _) && symIsRO(sym) && isU32Bit(off+int32(off2)) => (I32Const [int32(read32(sym, off+int32(off2), config.ctxt.Arch.ByteOrder))])
-(I32Load16U [off] (LoweredAddr {sym} [off2] (SB)) _) && symIsRO(sym) && isU32Bit(off+int32(off2)) => (I32Const [int32(read16(sym, off+int32(off2), config.ctxt.Arch.ByteOrder))])
-(I32Load8U [off] (LoweredAddr {sym} [off2] (SB)) _) && symIsRO(sym) && isU32Bit(off+int32(off2)) => (I32Const [int32(read8(sym, off+int32(off2)))])
+(I32Load [off] (LoweredAddr {sym} [off2] (SB)) _) && symIsRO(sym) && isU32Bit(int64(off+int32(off2))) => (I32Const [int32(read32(sym, off+int32(off2), config.ctxt.Arch.ByteOrder))])
+(I32Load16U [off] (LoweredAddr {sym} [off2] (SB)) _) && symIsRO(sym) && isU32Bit(int64(off+int32(off2))) => (I32Const [int32(read16(sym, off+int32(off2), config.ctxt.Arch.ByteOrder))])
+(I32Load8U [off] (LoweredAddr {sym} [off2] (SB)) _) && symIsRO(sym) && isU32Bit(int64(off+int32(off2))) => (I32Const [int32(read8(sym, off+int32(off2)))])

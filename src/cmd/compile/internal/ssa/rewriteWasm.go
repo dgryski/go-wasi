@@ -852,11 +852,11 @@ func rewriteValueWasm_OpConst8(v *Value) bool {
 }
 func rewriteValueWasm_OpConstBool(v *Value) bool {
 	// match: (ConstBool [c])
-	// result: (I32Const [b2i(c)])
+	// result: (I32Const [b2i32(c)])
 	for {
 		c := auxIntToBool(v.AuxInt)
 		v.reset(OpWasmI32Const)
-		v.AuxInt = int32ToAuxInt(b2i(c))
+		v.AuxInt = int32ToAuxInt(b2i32(c))
 		return true
 	}
 }
@@ -2070,7 +2070,7 @@ func rewriteValueWasm_OpMove(v *Value) bool {
 	}
 	// match: (Move [s] dst src mem)
 	// cond: s > 4 && s < 8
-	// result: (I32Store [s-4] dst (I32Load [s-4] src mem) (I32Store dst (I32Load src mem) mem))
+	// result: (I32Store [int32(s-4)] dst (I32Load [int32(s-4)] src mem) (I32Store dst (I32Load src mem) mem))
 	for {
 		s := auxIntToInt64(v.AuxInt)
 		dst := v_0
@@ -2080,9 +2080,9 @@ func rewriteValueWasm_OpMove(v *Value) bool {
 			break
 		}
 		v.reset(OpWasmI32Store)
-		v.AuxInt = int32ToAuxInt(s - 4)
+		v.AuxInt = int32ToAuxInt(int32(s - 4))
 		v0 := b.NewValue0(v.Pos, OpWasmI32Load, typ.UInt32)
-		v0.AuxInt = int32ToAuxInt(s - 4)
+		v0.AuxInt = int32ToAuxInt(int32(s - 4))
 		v0.AddArg2(src, mem)
 		v1 := b.NewValue0(v.Pos, OpWasmI32Store, types.TypeMem)
 		v2 := b.NewValue0(v.Pos, OpWasmI32Load, typ.UInt32)
@@ -3716,7 +3716,7 @@ func rewriteValueWasm_OpWasmI32AddConst(v *Value) bool {
 		return true
 	}
 	// match: (I32AddConst [off] (LoweredAddr {sym} [off2] base))
-	// cond: isU32Bit(off+int32(off2))
+	// cond: isU32Bit(int64(off+int32(off2)))
 	// result: (LoweredAddr {sym} [int32(off)+off2] base)
 	for {
 		off := auxIntToInt32(v.AuxInt)
@@ -3726,7 +3726,7 @@ func rewriteValueWasm_OpWasmI32AddConst(v *Value) bool {
 		off2 := auxIntToInt32(v_0.AuxInt)
 		sym := auxToSym(v_0.Aux)
 		base := v_0.Args[0]
-		if !(isU32Bit(off + int32(off2))) {
+		if !(isU32Bit(int64(off + int32(off2)))) {
 			break
 		}
 		v.reset(OpWasmLoweredAddr)
@@ -3940,7 +3940,7 @@ func rewriteValueWasm_OpWasmI32Load(v *Value) bool {
 		return true
 	}
 	// match: (I32Load [off] (LoweredAddr {sym} [off2] (SB)) _)
-	// cond: symIsRO(sym) && isU32Bit(off+int32(off2))
+	// cond: symIsRO(sym) && isU32Bit(int64(off+int32(off2)))
 	// result: (I32Const [int32(read32(sym, off+int32(off2), config.ctxt.Arch.ByteOrder))])
 	for {
 		off := auxIntToInt32(v.AuxInt)
@@ -3950,7 +3950,7 @@ func rewriteValueWasm_OpWasmI32Load(v *Value) bool {
 		off2 := auxIntToInt32(v_0.AuxInt)
 		sym := auxToSym(v_0.Aux)
 		v_0_0 := v_0.Args[0]
-		if v_0_0.Op != OpSB || !(symIsRO(sym) && isU32Bit(off+int32(off2))) {
+		if v_0_0.Op != OpSB || !(symIsRO(sym) && isU32Bit(int64(off+int32(off2)))) {
 			break
 		}
 		v.reset(OpWasmI32Const)
@@ -4008,7 +4008,7 @@ func rewriteValueWasm_OpWasmI32Load16U(v *Value) bool {
 		return true
 	}
 	// match: (I32Load16U [off] (LoweredAddr {sym} [off2] (SB)) _)
-	// cond: symIsRO(sym) && isU32Bit(off+int32(off2))
+	// cond: symIsRO(sym) && isU32Bit(int64(off+int32(off2)))
 	// result: (I32Const [int32(read16(sym, off+int32(off2), config.ctxt.Arch.ByteOrder))])
 	for {
 		off := auxIntToInt32(v.AuxInt)
@@ -4018,7 +4018,7 @@ func rewriteValueWasm_OpWasmI32Load16U(v *Value) bool {
 		off2 := auxIntToInt32(v_0.AuxInt)
 		sym := auxToSym(v_0.Aux)
 		v_0_0 := v_0.Args[0]
-		if v_0_0.Op != OpSB || !(symIsRO(sym) && isU32Bit(off+int32(off2))) {
+		if v_0_0.Op != OpSB || !(symIsRO(sym) && isU32Bit(int64(off+int32(off2)))) {
 			break
 		}
 		v.reset(OpWasmI32Const)
@@ -4074,7 +4074,7 @@ func rewriteValueWasm_OpWasmI32Load8U(v *Value) bool {
 		return true
 	}
 	// match: (I32Load8U [off] (LoweredAddr {sym} [off2] (SB)) _)
-	// cond: symIsRO(sym) && isU32Bit(off+int32(off2))
+	// cond: symIsRO(sym) && isU32Bit(int64(off+int32(off2)))
 	// result: (I32Const [int32(read8(sym, off+int32(off2)))])
 	for {
 		off := auxIntToInt32(v.AuxInt)
@@ -4084,7 +4084,7 @@ func rewriteValueWasm_OpWasmI32Load8U(v *Value) bool {
 		off2 := auxIntToInt32(v_0.AuxInt)
 		sym := auxToSym(v_0.Aux)
 		v_0_0 := v_0.Args[0]
-		if v_0_0.Op != OpSB || !(symIsRO(sym) && isU32Bit(off+int32(off2))) {
+		if v_0_0.Op != OpSB || !(symIsRO(sym) && isU32Bit(int64(off+int32(off2)))) {
 			break
 		}
 		v.reset(OpWasmI32Const)
