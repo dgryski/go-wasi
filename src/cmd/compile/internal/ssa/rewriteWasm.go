@@ -3736,12 +3736,12 @@ func rewriteValueWasm_OpWasmI32AddConst(v *Value) bool {
 		return true
 	}
 	// match: (I32AddConst [off] x:(SP))
-	// cond: isU32Bit(off)
+	// cond: isU32Bit(int64(off))
 	// result: (LoweredAddr [int32(off)] x)
 	for {
 		off := auxIntToInt32(v.AuxInt)
 		x := v_0
-		if x.Op != OpSP || !(isU32Bit(off)) {
+		if x.Op != OpSP || !(isU32Bit(int64(off))) {
 			break
 		}
 		v.reset(OpWasmLoweredAddr)
