@@ -494,6 +494,6 @@
 (I32AddConst [off] x:(SP)) && isU32Bit(int64(off)) => (LoweredAddr [int32(off)] x) // so it is rematerializeable
 
 // transforming readonly globals into constants
-(I32Load [off] (LoweredAddr {sym} [off2] (SB)) _) && symIsRO(sym) && isU32Bit(int64(off+int32(off2))) => (I32Const [int32(read32(sym, off+int32(off2), config.ctxt.Arch.ByteOrder))])
-(I32Load16U [off] (LoweredAddr {sym} [off2] (SB)) _) && symIsRO(sym) && isU32Bit(int64(off+int32(off2))) => (I32Const [int32(read16(sym, off+int32(off2), config.ctxt.Arch.ByteOrder))])
-(I32Load8U [off] (LoweredAddr {sym} [off2] (SB)) _) && symIsRO(sym) && isU32Bit(int64(off+int32(off2))) => (I32Const [int32(read8(sym, off+int32(off2)))])
+(I32Load [off] (LoweredAddr {sym} [off2] (SB)) _) && symIsRO(sym) && isU32Bit(int64(off+int32(off2))) => (I32Const [int32(read32(sym, int64(off+int32(off2)), config.ctxt.Arch.ByteOrder))])
+(I32Load16U [off] (LoweredAddr {sym} [off2] (SB)) _) && symIsRO(sym) && isU32Bit(int64(off+int32(off2))) => (I32Const [int32(read16(sym, int64(off+int32(off2)), config.ctxt.Arch.ByteOrder))])
+(I32Load8U [off] (LoweredAddr {sym} [off2] (SB)) _) && symIsRO(sym) && isU32Bit(int64(off+int32(off2))) => (I32Const [int32(read8(sym, int64(off+int32(off2))))])

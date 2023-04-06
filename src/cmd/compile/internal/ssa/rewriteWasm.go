@@ -3941,7 +3941,7 @@ func rewriteValueWasm_OpWasmI32Load(v *Value) bool {
 	}
 	// match: (I32Load [off] (LoweredAddr {sym} [off2] (SB)) _)
 	// cond: symIsRO(sym) && isU32Bit(int64(off+int32(off2)))
-	// result: (I32Const [int32(read32(sym, off+int32(off2), config.ctxt.Arch.ByteOrder))])
+	// result: (I32Const [int32(read32(sym, int64(off+int32(off2)), config.ctxt.Arch.ByteOrder))])
 	for {
 		off := auxIntToInt32(v.AuxInt)
 		if v_0.Op != OpWasmLoweredAddr {
@@ -3954,7 +3954,7 @@ func rewriteValueWasm_OpWasmI32Load(v *Value) bool {
 			break
 		}
 		v.reset(OpWasmI32Const)
-		v.AuxInt = int32ToAuxInt(int32(read32(sym, off+int32(off2), config.ctxt.Arch.ByteOrder)))
+		v.AuxInt = int32ToAuxInt(int32(read32(sym, int64(off+int32(off2)), config.ctxt.Arch.ByteOrder)))
 		return true
 	}
 	return false
@@ -4009,7 +4009,7 @@ func rewriteValueWasm_OpWasmI32Load16U(v *Value) bool {
 	}
 	// match: (I32Load16U [off] (LoweredAddr {sym} [off2] (SB)) _)
 	// cond: symIsRO(sym) && isU32Bit(int64(off+int32(off2)))
-	// result: (I32Const [int32(read16(sym, off+int32(off2), config.ctxt.Arch.ByteOrder))])
+	// result: (I32Const [int32(read16(sym, int64(off+int32(off2)), config.ctxt.Arch.ByteOrder))])
 	for {
 		off := auxIntToInt32(v.AuxInt)
 		if v_0.Op != OpWasmLoweredAddr {
@@ -4022,7 +4022,7 @@ func rewriteValueWasm_OpWasmI32Load16U(v *Value) bool {
 			break
 		}
 		v.reset(OpWasmI32Const)
-		v.AuxInt = int32ToAuxInt(int32(read16(sym, off+int32(off2), config.ctxt.Arch.ByteOrder)))
+		v.AuxInt = int32ToAuxInt(int32(read16(sym, int64(off+int32(off2)), config.ctxt.Arch.ByteOrder)))
 		return true
 	}
 	return false
@@ -4075,7 +4075,7 @@ func rewriteValueWasm_OpWasmI32Load8U(v *Value) bool {
 	}
 	// match: (I32Load8U [off] (LoweredAddr {sym} [off2] (SB)) _)
 	// cond: symIsRO(sym) && isU32Bit(int64(off+int32(off2)))
-	// result: (I32Const [int32(read8(sym, off+int32(off2)))])
+	// result: (I32Const [int32(read8(sym, int64(off+int32(off2))))])
 	for {
 		off := auxIntToInt32(v.AuxInt)
 		if v_0.Op != OpWasmLoweredAddr {
@@ -4088,7 +4088,7 @@ func rewriteValueWasm_OpWasmI32Load8U(v *Value) bool {
 			break
 		}
 		v.reset(OpWasmI32Const)
-		v.AuxInt = int32ToAuxInt(int32(read8(sym, off+int32(off2))))
+		v.AuxInt = int32ToAuxInt(int32(read8(sym, int64(off+int32(off2)))))
 		return true
 	}
 	return false
